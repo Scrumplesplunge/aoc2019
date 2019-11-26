@@ -174,30 +174,32 @@ int main() {
 
   // Emit make rules.
   for (const auto& [module, file] : state.modules) {
-    std::cout << "build/" << module << ".pcm:";
+    // Rule to build the module interface for a module.
+    std::cout << "build/" << module << ".pcm: " << file.c_str();
     const auto& dependencies = state.files.at(file).dependencies;
     for (const auto& dependency : dependencies) {
       if (state.modules.contains(dependency)) {
         std::cout << " build/" << dependency << ".pcm";
       }
     }
-    std::cout << "\n\nbuild/" << module << ".o: " << file.c_str() << " |";
+    // Rule to build the module itself.
+    std::cout << "\nbuild/" << module << ".o: " << file.c_str() << " |";
     for (const auto& dependency : dependencies) {
       if (state.modules.contains(dependency)) {
         std::cout << " build/" << dependency << ".pcm";
       }
     }
-    std::cout << "\n\n";
+    std::cout << "\n";
   }
   for (const auto& binary : state.binaries) {
-    std::cout << "\n\nbuild/" << binary.stem().c_str()
+    std::cout << "\nbuild/" << binary.stem().c_str()
               << ".o: " << binary.c_str();
     for (const auto& dependency : state.files[binary].dependencies) {
       if (state.modules.contains(dependency)) {
         std::cout << " build/" << dependency << ".pcm";
       }
     }
-    std::cout << "\n\n";
+    std::cout << "\n";
     std::cout << "bin/" << binary.stem().c_str() << ": build/"
               << binary.stem().c_str() << ".o";
     for (const auto& dependency : state.recursive_dependencies(binary)) {

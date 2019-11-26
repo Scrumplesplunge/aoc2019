@@ -27,14 +27,16 @@ bin:
 build:
 	mkdir -p build
 
-build/%.pcm: src/%.cc | build
+build/%.pcm: | build
 	${MKBMI} -c $< -o $@
 
-build/%.o: src/%.cc | build
+build/%.o: | build
 	${CXX} -c $< -o $@
 
 bin/%: build/%.o | bin
 	${CXX} $^ -o $@
+
+build/build.o: src/build.cc
 
 -include build/depends.mk
 
