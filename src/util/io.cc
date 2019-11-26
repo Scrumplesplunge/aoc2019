@@ -69,6 +69,9 @@ export constexpr bool is_punct(char c) { return type_map[c] & punct; }
 export constexpr bool is_lower(char c) { return type_map[c] & lower; }
 export constexpr bool is_upper(char c) { return type_map[c] & upper; }
 
+export template <auto predicate>
+struct sequence { std::string_view& out; };
+
 export class scanner {
  public:
   scanner(std::string_view source) : source_(source) {}
@@ -111,14 +114,21 @@ export class scanner {
     return *this;
   }
 
-  scanner& operator>>(std::string_view& v) {
+  template <auto predicate>
+  scanner& operator>>(sequence<predicate> s) {
     *this >> whitespace;
     if (source_.empty()) throw_error("unexpected end of input.");
     const auto word_start = source_.data(), last = word_start + source_.size();
-    const auto word_end = std::find_if(word_start, last, is_space);
-    v = std::string_view(word_start, word_end - word_start);
+    const auto word_end = std::find_if_not(word_start, last, predicate);
+    if (word_start == word_end) throw_error("invalid input.");
+    s.out = std::string_view(word_start, word_end - word_start);
     advance(word_end - word_start);
     return *this;
+  }
+
+  scanner& operator>>(std::string_view& v) {
+    constexpr auto not_space = [](char c) { return !is_space(c); };
+    return *this >> sequence<+not_space>{v};
   }
 
   std::string_view remaining() const { return source_; }

@@ -14,7 +14,7 @@ int main(int argc, char* argv[]) {
   scanner s{contents(argv[1])};
   std::string_view name;
   int x;
-  s >> exact{"Hello, "} >> name >> whitespace >> exact{"!"};
+  s >> exact{"Hello, "} >> sequence<is_alpha>{name} >> exact{"!"};
   s >> x;
   std::cout << "name: " << name << "\n"
             << "x: " << x << "\n";
