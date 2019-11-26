@@ -22,8 +22,10 @@ struct vec2 {
   T x, y;
 };
 
-// Currently (2019-11-14) this exported deduction guide doesn't seem to work :(
-// I'll leave it here just in case it starts working with newer compilers.
+// BUG: Currently (2019-11-14) this exported deduction guide doesn't seem to
+// work :( Adding the "export" keyword in front of the class declaration above
+// seems to make this line stop having any effect. I'll leave it here just in
+// case it starts working with newer compilers.
 export template <typename T>
 vec2(T, T) -> vec2<T>;
 
