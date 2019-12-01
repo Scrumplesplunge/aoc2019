@@ -3,6 +3,7 @@
 // not require this to be imported here but it does.
 import <charconv>;
 import <iostream>;
+import <optional>;
 import io;
 
 int main(int argc, char* argv[]) {

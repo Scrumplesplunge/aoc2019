@@ -10,6 +10,9 @@ export module io;
 import <array>;
 import <charconv>;
 import <iomanip>;
+import <iostream>;
+import <optional>;
+import <span>;
 import <stdexcept>;
 import <string>;
 import <string_view>;
@@ -69,45 +72,63 @@ export constexpr bool is_punct(char c) { return type_map[c] & punct; }
 export constexpr bool is_lower(char c) { return type_map[c] & lower; }
 export constexpr bool is_upper(char c) { return type_map[c] & upper; }
 
+export class scanner_error : public std::runtime_error {
+ public:
+  using runtime_error::runtime_error;
+};
+
 export template <auto predicate>
 struct sequence { std::string_view& out; };
 
 export class scanner {
  public:
+  struct end_type {};
+  static constexpr end_type end;
+
   scanner(std::string_view source) : source_(source) {}
+
+  bool ok() const { return !error_; }
+  operator bool() const { return ok() && !done(); }
+  std::string_view error() const { return error_ ? *error_ : ""; }
+
+  void check_ok() const { if (!ok()) throw scanner_error(*error_); }
 
   template <typename Arithmetic,
             typename = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
   scanner& operator>>(Arithmetic& a) {
+    if (error_.has_value()) return *this;
     // BUG: std::from_chars is supposed to behave like std::strtol, and
     // std::strtol is supposed to ignore leading whitespace, but unless I skip
     // the whitespace it fails to parse numbers.
     *this >> whitespace;
     auto [ptr, error] =
         std::from_chars(source_.data(), source_.data() + source_.size(), a);
-    if (error != std::errc()) throw_error("expected arithmetic type.");
+    if (error != std::errc()) return set_error("expected arithmetic type.");
     advance(ptr - source_.data());
     return *this;
   }
 
   scanner& operator>>(exact e) {
+    if (error_.has_value()) return *this;
     if (!source_.starts_with(e.value)) {
       std::ostringstream message;
       message << "expected literal string " << std::quoted(e.value) << ".";
-      throw_error(message.str());
+      return set_error(message.str());
     }
     advance(e.value.size());
     return *this;
   }
 
   scanner& operator>>(char& c) {
-    if (source_.empty()) throw_error("unexpected end of input.");
+    if (error_.has_value()) return *this;
+    if (source_.empty()) return set_error("unexpected end of input.");
     c = source_.front();
     advance(1);
     return *this;
   }
 
   scanner& operator>>(whitespace_type) {
+    if (error_.has_value()) return *this;
     const auto first = source_.data(), last = first + source_.size();
     const auto word_start = std::find_if_not(first, last, is_space);
     advance(word_start - first);
@@ -116,19 +137,49 @@ export class scanner {
 
   template <auto predicate>
   scanner& operator>>(sequence<predicate> s) {
+    if (error_.has_value()) return *this;
     *this >> whitespace;
-    if (source_.empty()) throw_error("unexpected end of input.");
+    if (source_.empty()) return set_error("unexpected end of input.");
     const auto word_start = source_.data(), last = word_start + source_.size();
     const auto word_end = std::find_if_not(word_start, last, predicate);
-    if (word_start == word_end) throw_error("invalid input.");
+    if (word_start == word_end) return set_error("invalid input.");
     s.out = std::string_view(word_start, word_end - word_start);
     advance(word_end - word_start);
     return *this;
   }
 
   scanner& operator>>(std::string_view& v) {
+    if (error_.has_value()) return *this;
     constexpr auto not_space = [](char c) { return !is_space(c); };
     return *this >> sequence<+not_space>{v};
+  }
+
+  template <typename T>
+  scanner& operator>>(std::span<T>& s) {
+    if (error_.has_value()) return *this;
+    std::size_t count = 0;
+    try {
+      for (T& t : s) {
+        *this >> t;
+        count++;
+      }
+    } catch (const scanner_error& error) {}
+    s = s.subspan(0, count);
+    return *this;
+  }
+
+  scanner& operator>>(end_type) {
+    if (error_.has_value()) return *this;
+    *this >> whitespace;
+    if (!source_.empty()) {
+      return set_error("trailing characters after expected end of input.");
+    }
+    return *this;
+  }
+
+  bool done() const {
+    const auto first = source_.data(), last = first + source_.size();
+    return std::find_if_not(first, last, is_space) == last;
   }
 
   std::string_view remaining() const { return source_; }
@@ -155,7 +206,7 @@ export class scanner {
     source_.remove_prefix(amount);
   }
 
-  void throw_error(std::string_view message) {
+  scanner& set_error(std::string_view message) {
     const auto line_start = source_.data() - (column_ - 1);
     const auto line_end =
         std::find(source_.data(), source_.data() + source_.size(), '\n');
@@ -165,9 +216,19 @@ export class scanner {
     output << line_ << ':' << column_ << ": " << message << "\n"
            << "    " << line_contents << "\n"
            << std::string(3 + column_, ' ') << "^\n";
-    throw std::runtime_error(output.str());
+    error_ = output.str();
+    return *this;
   }
 
+  std::optional<std::string> error_;
   std::string_view source_;
   int line_ = 1, column_ = 1;
 };
+
+export std::string_view init(int argc, char* argv[]) {
+  if (argc != 2) {
+    std::cerr << "Usage: " << argv[0] << " <filename>\n";
+    std::exit(1);
+  }
+  return contents(argv[1]);
+}
