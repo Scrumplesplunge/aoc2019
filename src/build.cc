@@ -36,6 +36,7 @@ struct state {
   }
 
   bool should_scan(const fs::path& file) {
+    if (file.extension() != ".cc") return false;
     auto i = files.find(file);
     if (i == files.end()) return true;
     i->second.from_cache = false;
