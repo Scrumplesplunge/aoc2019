@@ -1,7 +1,8 @@
 CXX = clang++ -std=c++2a -stdlib=libc++ \
 			-fimplicit-modules -fimplicit-module-maps \
 			-fmodules-cache-path=build \
-			-fprebuilt-module-path=build
+			-fprebuilt-module-path=build \
+			-Wall -Wextra -pedantic
 
 .PHONY: default opt debug all clean
 .PRECIOUS: build/build.o
