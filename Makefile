@@ -7,12 +7,11 @@ CXX = clang++ -std=c++2a -stdlib=libc++ \
 .PHONY: default opt debug all clean
 .PRECIOUS: build/build.o
 
-default: debug
+default: all
 
-opt: CXXFLAGS += -Ofast -ffunction-sections -fdata-sections -flto -DNDEBUG
-opt: LDFLAGS += -Wl,--gc-sections -s
-
-debug: CXXFLAGS += -Og -g3
+CXXFLAGS = -Og -g3
+opt: CXXFLAGS = -Ofast -ffunction-sections -fdata-sections -flto -DNDEBUG
+opt: LDFLAGS = -Wl,--gc-sections -s
 
 opt: all
 debug: all
@@ -32,10 +31,10 @@ build/%.pcm: | build
 	${MKBMI} -c $< -o $@
 
 build/%.o: | build
-	${CXX} -c $< -o $@
+	${CXX} ${CXXFLAGS} -c $< -o $@
 
 bin/%: build/%.o | bin
-	${CXX} $^ -o $@
+	${CXX} ${CXXFLAGS} $^ ${LDFLAGS} -o $@
 
 build/build.o: src/build.cc
 
