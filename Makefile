@@ -28,7 +28,7 @@ build:
 	mkdir -p build
 
 build/%.pcm: | build
-	${MKBMI} -c $< -o $@
+	${MKBMI} ${CXXFLAGS} -c $< -o $@
 
 build/%.o: | build
 	${CXX} ${CXXFLAGS} -c $< -o $@
