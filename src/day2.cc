@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
   std::array<int, 256> values = {};
   (input >> values[0]).check_ok();
   int n = 1;
-  while (!input.done()) (input >> exact{","} >> values[n++]).check_ok();
+  while (!input.done()) (input >> exact(",") >> values[n++]).check_ok();
   const std::span program(begin(values), n);
   std::cout << "part1 " << run(program, 12, 2) << '\n'
             << "part2 " << bruteforce(program) << '\n';

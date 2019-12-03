@@ -14,6 +14,10 @@ constexpr auto is_direction(char c) {
 
 template <typename T> constexpr T abs(T x) { return x < 0 ? -x : x; }
 
+auto matches_direction(char& c) {
+  return matches<is_direction>(c, "direction");
+}
+
 int main(int argc, char* argv[]) {
   scanner scanner(init(argc, argv));
   // Read the wires into two vectors.
@@ -25,7 +29,7 @@ int main(int argc, char* argv[]) {
     while (true) {
       char direction;
       int distance;
-      (scanner >> matches<is_direction>(direction) >> distance).check_ok();
+      (scanner >> matches_direction(direction) >> distance).check_ok();
       for (int i = 0; i < distance; i++) {
         switch (direction) {
           case 'R': position.x--; break;
@@ -36,7 +40,7 @@ int main(int argc, char* argv[]) {
         wire.push_back({position, ++steps});
       }
       if (scanner.remaining().substr(0, 1) != ",") break;
-      (scanner >> exact{","}).check_ok();
+      (scanner >> exact(",")).check_ok();
     }
     sort(begin(wire), end(wire), [](const auto& l, const auto& r) {
       return l.position == r.position ? l.steps < r.steps

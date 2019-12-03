@@ -55,7 +55,7 @@ int main(int argc, char* argv[]) {
         wire.emplace(position, ++steps);
       }
       if (scanner.remaining().substr(0, 1) != ",") break;
-      (scanner >> exact{","}).check_ok();
+      (scanner >> exact(",")).check_ok();
     }
   }
   std::cout << wire.size() << '\n';
@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
         }
       }
       if (scanner.remaining().substr(0, 1) != ",") break;
-      (scanner >> exact{","}).check_ok();
+      (scanner >> exact(",")).check_ok();
     }
     check(scanner.done());
   }

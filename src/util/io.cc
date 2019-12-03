@@ -43,7 +43,11 @@ export std::string_view contents(const char* filename) {
   return std::string_view(data, info.st_size);
 }
 
-export struct exact { std::string_view value; };
+enum whitespace_policy {
+  skip_leading_whitespace,
+  match_leading_whitespace,
+};
+
 export constexpr struct whitespace_type {} whitespace;
 
 enum char_type : unsigned char {
@@ -78,16 +82,37 @@ export class scanner_error : public std::runtime_error {
 };
 
 export template <auto predicate, typename T>
-struct match_type { T& out; };
+struct match_type { T& out; std::string_view name; };
 
 export template <auto predicate, typename T>
-auto matches(T& out) { return match_type<predicate, T>{out}; }
+auto matches(T& out,
+             std::string_view name = "<expression matching predicate>") {
+  return match_type<predicate, T>{out, name};
+}
 
 export template <auto predicate>
-struct sequence_type { std::string_view& out; };
+struct sequence_type { std::string_view& out; std::string_view name; };
 
 export template <auto predicate>
-auto sequence(std::string_view& out) { return sequence_type<predicate>{out}; }
+auto sequence(std::string_view& out,
+              std::string_view name = "<sequence matching predicate>") {
+  return sequence_type<predicate>{out, name};
+}
+
+export struct exact_type {
+  std::string_view value;
+  whitespace_policy whitespace_policy;
+};
+
+export auto exact(std::string_view text) {
+  return exact_type{text, !text.empty() && is_space(text.front())
+                              ? match_leading_whitespace
+                              : skip_leading_whitespace};
+}
+
+export auto exact(std::string_view text, whitespace_policy policy) {
+  return exact_type{text, policy};
+}
 
 export class scanner {
  public:
@@ -99,6 +124,7 @@ export class scanner {
   bool ok() const { return !error_; }
   operator bool() const { return ok() && !done(); }
   std::string_view error() const { return error_ ? *error_ : ""; }
+  void clear() { error_.reset(); }
 
   void check_ok() const { if (!ok()) throw scanner_error(*error_); }
 
@@ -117,8 +143,12 @@ export class scanner {
     return *this;
   }
 
-  [[nodiscard]] scanner& operator>>(exact e) {
+  [[nodiscard]] scanner& operator>>(exact_type e) {
     if (error_.has_value()) return *this;
+    if (e.whitespace_policy == skip_leading_whitespace &&
+        !(*this >> whitespace)) {
+      return *this;
+    }
     if (!source_.starts_with(e.value)) {
       std::ostringstream message;
       message << "expected literal string " << std::quoted(e.value) << ".";
@@ -150,7 +180,12 @@ export class scanner {
     *this >> whitespace;
     location l{source_, line_, column_};
     if (!(*this >> m.out)) return *this;
-    if (!predicate(m.out)) return set_error(l, "invalid input.");
+    if (!predicate(m.out)) {
+      source_ = l.source;
+      line_ = l.line;
+      column_ = l.column;
+      return set_error(l, "expected " + std::string(m.name));
+    }
     return *this;
   }
 
@@ -161,7 +196,9 @@ export class scanner {
     if (source_.empty()) return set_error("unexpected end of input.");
     const auto word_start = source_.data(), last = word_start + source_.size();
     const auto word_end = std::find_if_not(word_start, last, predicate);
-    if (word_start == word_end) return set_error("invalid input.");
+    if (word_start == word_end) {
+      return set_error("expected " + std::string(s.name));
+    }
     s.out = std::string_view(word_start, word_end - word_start);
     advance(word_end - word_start);
     return *this;
@@ -231,16 +268,44 @@ export class scanner {
   }
 
   scanner& set_error(location l, std::string_view message) {
-    const auto line_start = l.source.data() - (l.column - 1);
+    const int index = l.column - 1;
+    const auto line_start = l.source.data() - index;
     const auto line_end =
         std::find(l.source.data(), l.source.data() + l.source.size(), '\n');
     const auto line_contents =
         std::string_view(line_start, line_end - line_start);
     std::ostringstream output;
-    output << l.line << ':' << l.column << ": " << message << "\n"
-           << "    " << line_contents << "\n"
-           << std::string(3 + l.column, ' ') << "^\n";
+    output << l.line << ':' << l.column << ": " << message << "\n";
+    constexpr int line_length = 80, indent = 4;
+    constexpr int midpoint = (line_length - indent) / 2;
+    if (line_contents.size() <= line_length - indent) {
+      // Show the full line.
+      output << "    " << line_contents << "\n"
+             << std::string(indent + index, ' ') << "^\n";
+    } else if (index <= midpoint) {
+      // Show the line with a trailing ellipsis.
+      output << "    " << line_contents.substr(0, line_length - indent - 3)
+             << "...\n"
+             << std::string(indent + index, ' ') << "^\n";
+    } else if (line_contents.size() - index <= midpoint) {
+      // Show the line with a leading ellipsis.
+      output << "    ..."
+             << line_contents.substr(line_contents.size() -
+                                     (line_length - indent - 3))
+             << "\n"
+             << std::string(line_length - line_contents.size() + index, ' ')
+             << "^\n";
+    } else {
+      // Show the line with both leading and trailing ellipses.
+      output << "    ..."
+             << line_contents.substr(index - midpoint + 3,
+                                     line_length - indent - 6)
+             << "...\n"
+             << std::string(indent + midpoint, ' ') << "^\n";
+    }
     error_ = output.str();
+    //std::cerr << *error_ << '\n';
+    std::cerr << *error_ << '\n';
     return *this;
   }
 
