@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
     while (true) {
       char direction;
       int distance;
-      scanner >> matches<is_direction>(direction) >> distance;
+      (scanner >> matches<is_direction>(direction) >> distance).check_ok();
       for (int i = 0; i < distance; i++) {
         switch (direction) {
           case 'R': position.x--; break;
@@ -36,14 +36,14 @@ int main(int argc, char* argv[]) {
         wire.push_back({position, ++steps});
       }
       if (scanner.remaining().substr(0, 1) != ",") break;
-      scanner >> exact{","};
+      (scanner >> exact{","}).check_ok();
     }
     sort(begin(wire), end(wire), [](const auto& l, const auto& r) {
       return l.position == r.position ? l.steps < r.steps
                                       : l.position < r.position;
     });
   }
-  check(scanner.done());
+  (scanner >> scanner::end).check_ok();
 
   // Find all intersection points and take note of the points which meet the
   // criteria for the questions.

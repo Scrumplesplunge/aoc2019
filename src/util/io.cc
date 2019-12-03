@@ -104,7 +104,7 @@ export class scanner {
 
   template <typename Arithmetic,
             typename = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
-  scanner& operator>>(Arithmetic& a) {
+  [[nodiscard]] scanner& operator>>(Arithmetic& a) {
     if (error_.has_value()) return *this;
     // BUG: std::from_chars is supposed to behave like std::strtol, and
     // std::strtol is supposed to ignore leading whitespace, but unless I skip
@@ -117,7 +117,7 @@ export class scanner {
     return *this;
   }
 
-  scanner& operator>>(exact e) {
+  [[nodiscard]] scanner& operator>>(exact e) {
     if (error_.has_value()) return *this;
     if (!source_.starts_with(e.value)) {
       std::ostringstream message;
@@ -128,7 +128,7 @@ export class scanner {
     return *this;
   }
 
-  scanner& operator>>(char& c) {
+  [[nodiscard]] scanner& operator>>(char& c) {
     if (error_.has_value()) return *this;
     if (source_.empty()) return set_error("unexpected end of input.");
     c = source_.front();
@@ -145,17 +145,17 @@ export class scanner {
   }
 
   template <auto predicate, typename T>
-  scanner& operator>>(match_type<predicate, T> m) {
+  [[nodiscard]] scanner& operator>>(match_type<predicate, T> m) {
     if (error_.has_value()) return *this;
     *this >> whitespace;
     location l{source_, line_, column_};
-    *this >> m.out;
+    if (!(*this >> m.out)) return *this;
     if (!predicate(m.out)) return set_error(l, "invalid input.");
     return *this;
   }
 
   template <auto predicate>
-  scanner& operator>>(sequence_type<predicate> s) {
+  [[nodiscard]] scanner& operator>>(sequence_type<predicate> s) {
     if (error_.has_value()) return *this;
     *this >> whitespace;
     if (source_.empty()) return set_error("unexpected end of input.");
@@ -167,14 +167,14 @@ export class scanner {
     return *this;
   }
 
-  scanner& operator>>(std::string_view& v) {
+  [[nodiscard]] scanner& operator>>(std::string_view& v) {
     if (error_.has_value()) return *this;
     constexpr auto not_space = [](char c) { return !is_space(c); };
     return *this >> sequence<+not_space>(v);
   }
 
   template <typename T>
-  scanner& operator>>(std::span<T>& s) {
+  [[nodiscard]] scanner& operator>>(std::span<T>& s) {
     if (error_.has_value()) return *this;
     std::size_t count = 0;
     try {
@@ -187,7 +187,7 @@ export class scanner {
     return *this;
   }
 
-  scanner& operator>>(end_type) {
+  [[nodiscard]] scanner& operator>>(end_type) {
     if (error_.has_value()) return *this;
     *this >> whitespace;
     if (!source_.empty()) {
