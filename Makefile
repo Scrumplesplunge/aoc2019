@@ -9,7 +9,7 @@ CXX = clang++ -std=c++2a -stdlib=libc++ \
 
 default: all
 
-CXXFLAGS = -Og -g3
+CXXFLAGS = -g3
 opt: CXXFLAGS = -Ofast -ffunction-sections -fdata-sections -flto -DNDEBUG
 opt: LDFLAGS = -Wl,--gc-sections -s
 
