@@ -19,8 +19,15 @@ struct vec2 {
   template <typename U>
   constexpr explicit vec2(vec2<U> other) : x(other.x), y(other.y) {}
 
-  T x, y;
+  constexpr auto manhattan_length() const {
+    constexpr auto abs = [](auto x) { return x < 0 ? -x : x; };
+    return abs(x) + abs(y);
+  }
+
+  T x = {}, y = {};
 };
+
+export using vec2i = vec2<int>;
 
 // BUG: Currently (2019-11-14) this exported deduction guide doesn't seem to
 // work :( Adding the "export" keyword in front of the class declaration above
