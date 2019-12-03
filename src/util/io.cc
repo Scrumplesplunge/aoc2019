@@ -77,8 +77,17 @@ export class scanner_error : public std::runtime_error {
   using runtime_error::runtime_error;
 };
 
+export template <auto predicate, typename T>
+struct match_type { T& out; };
+
+export template <auto predicate, typename T>
+auto matches(T& out) { return match_type<predicate, T>{out}; }
+
 export template <auto predicate>
-struct sequence { std::string_view& out; };
+struct sequence_type { std::string_view& out; };
+
+export template <auto predicate>
+auto sequence(std::string_view& out) { return sequence_type<predicate>{out}; }
 
 export class scanner {
  public:
@@ -135,8 +144,18 @@ export class scanner {
     return *this;
   }
 
+  template <auto predicate, typename T>
+  scanner& operator>>(match_type<predicate, T> m) {
+    if (error_.has_value()) return *this;
+    *this >> whitespace;
+    location l{source_, line_, column_};
+    *this >> m.out;
+    if (!predicate(m.out)) return set_error(l, "invalid input.");
+    return *this;
+  }
+
   template <auto predicate>
-  scanner& operator>>(sequence<predicate> s) {
+  scanner& operator>>(sequence_type<predicate> s) {
     if (error_.has_value()) return *this;
     *this >> whitespace;
     if (source_.empty()) return set_error("unexpected end of input.");
@@ -151,7 +170,7 @@ export class scanner {
   scanner& operator>>(std::string_view& v) {
     if (error_.has_value()) return *this;
     constexpr auto not_space = [](char c) { return !is_space(c); };
-    return *this >> sequence<+not_space>{v};
+    return *this >> sequence<+not_space>(v);
   }
 
   template <typename T>
@@ -193,6 +212,11 @@ export class scanner {
   int column() const { return column_; }
 
  private:
+  struct location {
+    std::string_view source;
+    int line = 1, column = 1;
+  };
+
   void advance(std::size_t amount) {
     assert(amount <= source_.length());
     for (char c : source_.substr(0, amount)) {
@@ -206,18 +230,22 @@ export class scanner {
     source_.remove_prefix(amount);
   }
 
-  scanner& set_error(std::string_view message) {
-    const auto line_start = source_.data() - (column_ - 1);
+  scanner& set_error(location l, std::string_view message) {
+    const auto line_start = l.source.data() - (l.column - 1);
     const auto line_end =
-        std::find(source_.data(), source_.data() + source_.size(), '\n');
+        std::find(l.source.data(), l.source.data() + l.source.size(), '\n');
     const auto line_contents =
         std::string_view(line_start, line_end - line_start);
     std::ostringstream output;
-    output << line_ << ':' << column_ << ": " << message << "\n"
+    output << l.line << ':' << l.column << ": " << message << "\n"
            << "    " << line_contents << "\n"
-           << std::string(3 + column_, ' ') << "^\n";
+           << std::string(3 + l.column, ' ') << "^\n";
     error_ = output.str();
     return *this;
+  }
+
+  scanner& set_error(std::string_view message) {
+    return set_error(location{source_, line_, column_}, message);
   }
 
   std::optional<std::string> error_;
