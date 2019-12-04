@@ -123,7 +123,9 @@ export class scanner {
 
   bool ok() const { return !error_; }
   operator bool() const { return ok(); }
-  std::string_view error() const { return error_ ? *error_ : ""; }
+  std::string_view error() const {
+    return error_ ? std::string_view(*error_) : "";
+  }
   void clear() { error_.reset(); }
 
   void check_ok() const {
