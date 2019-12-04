@@ -5,7 +5,7 @@ import <string_view>;
 import io;
 
 bool is_six_digit(int x) { return std::to_string(x).length() == 6; }
-auto password(int& x) { return matches<is_six_digit>(x, "password"); }
+auto password(int& x) { return matches<is_six_digit>(x, "6-digit password"); }
 
 bool two_adjacent_equal(std::string_view x) {
   for (int i = 1; i < 6; i++) {
