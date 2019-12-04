@@ -122,11 +122,16 @@ export class scanner {
   scanner(std::string_view source) : source_(source) {}
 
   bool ok() const { return !error_; }
-  operator bool() const { return ok() && !done(); }
+  operator bool() const { return ok(); }
   std::string_view error() const { return error_ ? *error_ : ""; }
   void clear() { error_.reset(); }
 
-  void check_ok() const { if (!ok()) throw scanner_error(*error_); }
+  void check_ok() const {
+    if (!ok()) {
+      std::cerr << *error_ << '\n';
+      std::abort();
+    }
+  }
 
   template <typename Arithmetic,
             typename = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
@@ -179,14 +184,11 @@ export class scanner {
     if (error_.has_value()) return *this;
     *this >> whitespace;
     location l{source_, line_, column_};
-    if (!(*this >> m.out)) return *this;
-    if (!predicate(m.out)) {
-      source_ = l.source;
-      line_ = l.line;
-      column_ = l.column;
-      return set_error(l, "expected " + std::string(m.name));
-    }
-    return *this;
+    if (*this >> m.out && predicate(m.out)) return *this;
+    source_ = l.source;
+    line_ = l.line;
+    column_ = l.column;
+    return set_error(l, "expected " + std::string(m.name));
   }
 
   template <auto predicate>
@@ -214,12 +216,11 @@ export class scanner {
   [[nodiscard]] scanner& operator>>(std::span<T>& s) {
     if (error_.has_value()) return *this;
     std::size_t count = 0;
-    try {
-      for (T& t : s) {
-        *this >> t;
-        count++;
-      }
-    } catch (const scanner_error& error) {}
+    for (T& t : s) {
+      if (!(*this >> t)) break;
+      count++;
+    }
+    clear();
     s = s.subspan(0, count);
     return *this;
   }
@@ -304,8 +305,6 @@ export class scanner {
              << std::string(indent + midpoint, ' ') << "^\n";
     }
     error_ = output.str();
-    //std::cerr << *error_ << '\n';
-    std::cerr << *error_ << '\n';
     return *this;
   }
 
