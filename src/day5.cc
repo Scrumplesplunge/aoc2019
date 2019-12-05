@@ -1,10 +1,10 @@
 import "util/check.h";
 import <charconv>;  // bug
-import <optional>;  // bug
+import <optional>;
 import <span>;
 import io;
 
-int run(std::span<const int> program) {
+int run(std::span<const int> program, std::optional<int> input) {
   std::array<int, 1000> a;
   copy(begin(program), end(program), begin(a));
   enum mode {
@@ -22,11 +22,11 @@ int run(std::span<const int> program) {
     }
     assert(false);
   };
+  std::optional<int> final_output;
   int pc = 0;
   while (true) {
     check(0 <= pc && pc < (int)program.size());
     int op = a[pc];
-    std::cout << "pc=" << pc << ", op=" << op << '\n';
     switch (op % 100) {
       case 1:
       case 2: {
@@ -37,11 +37,13 @@ int run(std::span<const int> program) {
         break;
       }
       case 3:
-        std::cin >> a[a[pc + 1]];
+        check(input);
+        a[a[pc + 1]] = *input;
+        input = std::nullopt;
         pc += 2;
         break;
       case 4:
-        std::cout << get(op / 100, a[pc + 1]);
+        final_output = get(op / 100, a[pc + 1]);
         pc += 2;
         break;
       case 5:
@@ -69,7 +71,8 @@ int run(std::span<const int> program) {
         pc += 4;
         break;
       case 99:
-        return 0;
+        check(final_output);
+        return *final_output;
       default:
         std::cerr << "illegal instruction " << a[pc] << " at pc=" << pc << "\n";
         std::abort();
@@ -87,5 +90,6 @@ int main(int argc, char* argv[]) {
     (scanner >> exact(",") >> values[n++]).check_ok();
   }
   const std::span program(begin(values), n);
-  run(program);
+  std::cout << "part1 " << run(program, 1) << '\n'
+            << "part2 " << run(program, 5) << '\n';
 }
