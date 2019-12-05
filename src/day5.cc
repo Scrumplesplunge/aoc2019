@@ -11,66 +11,83 @@ int run(std::span<const int> program, std::optional<int> input) {
     position = 0,
     immediate = 1,
   };
-  auto get = [&](int m, int x) {
-    check(m == position || m == immediate);
-    switch (m) {
-      case position:
-        check(0 <= x && x < (int)program.size());
-        return a[x];
-      case immediate:
-        return x;
-    }
-    assert(false);
+  enum class opcode {
+    add = 1,
+    mul = 2,
+    input = 3,
+    output = 4,
+    jump_if_true = 5,
+    jump_if_false = 6,
+    less_than = 7,
+    equals = 8,
+    halt = 99,
   };
   std::optional<int> final_output;
   int pc = 0;
   while (true) {
     check(0 <= pc && pc < (int)program.size());
     int op = a[pc];
-    switch (op % 100) {
-      case 1:
-      case 2: {
-        const auto left = get(op / 100 % 10, a[pc + 1]),
-                   right = get(op / 1000, a[pc + 2]);
-        a[a[pc + 3]] = op % 100 == 1 ? left + right : left * right;
+    opcode code = opcode(op % 100);
+    mode params[3];
+    auto get = [&](int param_index) {
+      check(pc + param_index + 1 < (int)program.size());
+      int x = a[pc + param_index + 1];
+      switch (params[param_index]) {
+        case position:
+          check(0 <= x && x < (int)program.size());
+          return a[x];
+        case immediate:
+          return x;
+      }
+      assert(false);
+    };
+    auto put = [&](int param_index, int value) {
+      check(pc + param_index + 1 < (int)program.size());
+      int x = a[pc + param_index + 1];
+      check(params[param_index] == position);
+      a[x] = value;
+    };
+    int x = op / 100;
+    for (int i = 0; i < 3; i++) {
+      params[i] = mode(x % 10);
+      // If this check fails, we have unsupported parameter modes.
+      check(params[i] == position || params[i] == immediate);
+      x /= 10;
+    }
+    // If this check fails, we have more parameter modes than any opcode uses.
+    check(x == 0);
+    switch (code) {
+      case opcode::add:
+      case opcode::mul: {
+        put(2, code == opcode::add ? get(0) + get(1) : get(0) * get(1));
         pc += 4;
         break;
       }
-      case 3:
+      case opcode::input:
         check(input);
-        a[a[pc + 1]] = *input;
+        put(0, *input);
         input = std::nullopt;
         pc += 2;
         break;
-      case 4:
-        final_output = get(op / 100, a[pc + 1]);
+      case opcode::output:
+        final_output = get(0);
         pc += 2;
         break;
-      case 5:
-        if (get(op / 100 % 10, a[pc + 1])) {
-          pc = get(op / 1000, a[pc + 2]);
-        } else {
-          pc += 3;
-        }
+      case opcode::jump_if_true:
+        pc = get(0) ? get(1) : pc + 3;
         break;
-      case 6:
-        if (get(op / 100 % 10, a[pc + 1]) == 0) {
-          pc = get(op / 1000, a[pc + 2]);
-        } else {
-          pc += 3;
-        }
+      case opcode::jump_if_false:
+        pc = get(0) ? pc + 3 : get(1);
         break;
-      case 7:
-        a[a[pc + 3]] =
-            get(op / 100 % 10, a[pc + 1]) < get(op / 1000 % 10, a[pc + 2]);
+      case opcode::less_than:
+        put(2, get(0) < get(1));
         pc += 4;
         break;
-      case 8:
-        a[a[pc + 3]] =
-            get(op / 100 % 10, a[pc + 1]) == get(op / 1000 % 10, a[pc + 2]);
+      case opcode::equals:
+        put(2, get(0) == get(1));
         pc += 4;
         break;
-      case 99:
+      case opcode::halt:
         check(final_output);
         return *final_output;
       default:
