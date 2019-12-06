@@ -75,6 +75,7 @@ export constexpr bool is_digit(char c) { return type_map[c] & digit; }
 export constexpr bool is_punct(char c) { return type_map[c] & punct; }
 export constexpr bool is_lower(char c) { return type_map[c] & lower; }
 export constexpr bool is_upper(char c) { return type_map[c] & upper; }
+export constexpr bool is_alnum(char c) { return type_map[c] & (alpha | digit); }
 
 export class scanner_error : public std::runtime_error {
  public:

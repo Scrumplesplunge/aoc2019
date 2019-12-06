@@ -173,7 +173,7 @@ int main(int argc, char* argv[]) {
   }
   const std::span program(begin(values), n);
   // To benchmark: bin/day5 puzzles/day5benchmark.txt
-  // check(run(program, 100'000'000) == 42);
-  std::cout << "part1 " << run(program, 1) << '\n'
-            << "part2 " << run(program, 5) << '\n';
+  check(run(program, 100'000'000) == 42);
+  //std::cout << "part1 " << run(program, 1) << '\n'
+  //          << "part2 " << run(program, 5) << '\n';
 }
