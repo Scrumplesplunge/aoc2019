@@ -28,18 +28,18 @@ int main(int argc, char* argv[]) {
       b = orbits.at(a);
     }
   }
-  int total = 0;
-  for (auto [planet, count] : indirect_orbits) total += count;
-  std::cout << "part1 " << total << "\n";
-  std::vector<std::string_view> you_steps, san_steps;
-  int xsteps = 0;
-  int best = 999999;
-  for (std::string_view x = orbits.at("YOU"); x != "COM"; xsteps++, x = orbits.at(x)) {
-    int ysteps = 0;
-    for (std::string_view y = orbits.at("SAN"); y != "COM";
-         ysteps++, y = orbits.at(y)) {
-      if (x == y && xsteps + ysteps < best) best = xsteps + ysteps;
+  int total_indirect_orbits = 0;
+  for (auto [planet, count] : indirect_orbits) total_indirect_orbits += count;
+  std::cout << "part1 " << total_indirect_orbits << "\n";
+
+  int x_steps = 0;
+  for (auto x = orbits.at("YOU"); x != "COM"; x_steps++, x = orbits.at(x)) {
+    int y_steps = 0;
+    for (auto y = orbits.at("SAN"); y != "COM"; y_steps++, y = orbits.at(y)) {
+      if (x == y) {
+        std::cout << "part2 " << x_steps + y_steps << '\n';
+        return 0;
+      }
     }
   }
-  std::cout << "part2 " << best << "\n";
 }
