@@ -40,6 +40,7 @@ int main(int argc, char* argv[]) {
   (scanner >> scanner::end).check_ok();
 
   // Part 1: count all direct and indirect orbits.
+  planets[key("COM")].exists = true;
   planets[key("COM")].value = 1;
   for (int i = 0, n = planets.size(); i < n; i++) {
     if (!planets[i].exists) continue;
@@ -48,6 +49,7 @@ int main(int argc, char* argv[]) {
     while (!planets[x].value) {
       length++;
       x = planets[x].parent;
+      check(planets[x].exists);
     }
     length += planets[x].value;
     check(length < 65536);
