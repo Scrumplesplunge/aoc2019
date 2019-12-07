@@ -1,6 +1,6 @@
 import "util/check.h";
 import <charconv>;  // bug
-import <optional>;
+import <optional>;  // bug
 import <span>;
 import io;
 
@@ -95,83 +95,125 @@ op decode_op(int x) {
   return ops[x];
 }
 
-std::span<int> run(std::span<int> program,
-                   std::span<const int> input, std::span<int> output) {
-  int pc = 0;
-  unsigned output_size = 0;
-  while (true) {
-    check(0 <= pc && pc < (int)program.size());
-    const auto op = decode_op(program[pc]);
-    check(pc + op_size(op.code) <= (int)program.size());
-    auto get = [&](int param_index) {
-      int x = program[pc + param_index + 1];
-      switch (op.params[param_index]) {
-        case mode::position: return program[x];
-        case mode::immediate: return x;
+class program {
+ public:
+  program() = default;
+
+  explicit program(std::span<const int> source) {
+    std::copy(std::begin(source), std::end(source), std::begin(buffer_));
+  }
+
+  enum state {
+    ready,
+    waiting_for_input,
+    output,
+    halt,
+  };
+
+  bool done() const { return state_ == halt; }
+
+  void provide_input(int x) {
+    check(state_ == waiting_for_input);
+    state_ = ready;
+    buffer_[buffer_[pc_ + 1]] = x;
+    pc_ += 2;
+  }
+
+  int get_output() {
+    check(state_ == output);
+    state_ = ready;
+    pc_ += 2;
+    return output_;
+  }
+
+  state resume() {
+    check(state_ == ready);
+    while (true) {
+      check(0 <= pc_ && pc_ < (int)buffer_.size());
+      const auto op = decode_op(buffer_[pc_]);
+      check(pc_ + op_size(op.code) <= (int)buffer_.size());
+      auto get = [&](int param_index) {
+        int x = buffer_[pc_ + param_index + 1];
+        switch (op.params[param_index]) {
+          case mode::position: return buffer_[x];
+          case mode::immediate: return x;
+        }
+        assert(false);
+      };
+      auto put = [&](int param_index, int value) {
+        int x = buffer_[pc_ + param_index + 1];
+        buffer_[x] = value;
+      };
+      switch (op.code) {
+        case opcode::illegal:
+          std::cerr << "illegal instruction " << buffer_[pc_]
+                    << " at pc_=" << pc_ << "\n";
+          std::abort();
+        case opcode::add:
+          put(2, get(0) + get(1));
+          pc_ += 4;
+          break;
+        case opcode::mul:
+          put(2, get(0) * get(1));
+          pc_ += 4;
+          break;
+        case opcode::input:
+          return state_ = waiting_for_input;
+        case opcode::output:
+          output_ = get(0);
+          return state_ = output;
+        case opcode::jump_if_true:
+          pc_ = get(0) ? get(1) : pc_ + 3;
+          break;
+        case opcode::jump_if_false:
+          pc_ = get(0) ? pc_ + 3 : get(1);
+          break;
+        case opcode::less_than:
+          put(2, get(0) < get(1));
+          pc_ += 4;
+          break;
+        case opcode::equals:
+          put(2, get(0) == get(1));
+          pc_ += 4;
+          break;
+        case opcode::halt:
+          return state_ = halt;
+        default:
+          std::cerr << "illegal instruction " << buffer_[pc_]
+                    << " at pc_=" << pc_ << "\n";
+          std::abort();
       }
-      assert(false);
-    };
-    auto put = [&](int param_index, int value) {
-      int x = program[pc + param_index + 1];
-      program[x] = value;
-    };
-    switch (op.code) {
-      case opcode::illegal:
-        std::cerr << "illegal instruction " << program[pc] << " at pc=" << pc
-                  << "\n";
-        std::abort();
-      case opcode::add:
-        put(2, get(0) + get(1));
-        pc += 4;
-        break;
-      case opcode::mul:
-        put(2, get(0) * get(1));
-        pc += 4;
-        break;
-      case opcode::input:
-        check(!input.empty());
-        put(0, input.front());
-        input = input.subspan(1);
-        pc += 2;
-        break;
-      case opcode::output:
-        check(output_size < output.size());
-        output[output_size++] = get(0);
-        pc += 2;
-        break;
-      case opcode::jump_if_true:
-        pc = get(0) ? get(1) : pc + 3;
-        break;
-      case opcode::jump_if_false:
-        pc = get(0) ? pc + 3 : get(1);
-        break;
-      case opcode::less_than:
-        put(2, get(0) < get(1));
-        pc += 4;
-        break;
-      case opcode::equals:
-        put(2, get(0) == get(1));
-        pc += 4;
-        break;
-      case opcode::halt:
-        return output.subspan(0, output_size);
-      default:
-        std::cerr << "illegal instruction " << program[pc] << " at pc=" << pc
-                  << "\n";
-        std::abort();
     }
   }
-}
 
-auto run_copy(std::span<const int> program, std::span<const int> input,
-              std::span<int> output) {
-  std::array<int, max_program_size> a;
-  check(program.size() <= a.size());
-  std::copy(std::begin(program), std::end(program), std::begin(a));
-  return run(std::span<int>(a.data(), program.size()), input, output);
-}
+  std::span<int> run(std::span<const int> input, std::span<int> output) {
+    unsigned output_size = 0;
+    while (true) {
+      switch (resume()) {
+        case state::ready:
+          continue;
+        case state::waiting_for_input:
+          check(!input.empty());
+          provide_input(input.front());
+          input = input.subspan(1);
+          break;
+        case state::output:
+          check(output_size < output.size());
+          output[output_size++] = get_output();
+          break;
+        case state::halt:
+          return output.subspan(0, output_size);
+      }
+    }
+  }
 
-int part1(std::span<const int> program) {
+ private:
+  state state_ = ready;
+  int pc_ = 0, output_ = 0;
+  std::array<int, max_program_size> buffer_;
+};
+
+int part1(std::span<const int> source) {
   int output[1000];
   int max_signal = -1'000'000'000;
   std::array<int, 5> signal = {0, 1, 2, 3, 4}, best_signal = {};
@@ -179,7 +221,7 @@ int part1(std::span<const int> program) {
     int value = 0;
     for (int phase : signal) {
       int input[] = {phase, value};
-      auto out = run_copy(program, input, output);
+      auto out = program(source).run(input, output);
       check(out.size() == 1);
       value = out[0];
     }
@@ -191,22 +233,30 @@ int part1(std::span<const int> program) {
   return max_signal;
 }
 
-int part2(std::span<const int> program) {
-  int output[1000];
+int part2(std::span<const int> source) {
   int max_signal = -1'000'000'000;
   std::array<int, 5> signal = {5, 6, 7, 8, 9}, best_signal = {};
   do {
-    std::array<int, max_program_size> programs[5];
-    for (auto& x : programs) {
-      std::copy(std::begin(program), std::end(program), std::begin(x));
+    program amplifier[5];
+    for (int i = 0; i < 5; i++) {
+      amplifier[i] = program(source);
+      check(amplifier[i].resume() == program::waiting_for_input);
+      amplifier[i].provide_input(signal[i]);
+      check(amplifier[i].resume() == program::waiting_for_input);
     }
     int value = 0;
-    for (int phase : signal) {
-      int input[] = {phase, value};
-      auto out = run_copy(program, input, output);
-      check(out.size() == 1);
-      value = out[0];
+    while (!amplifier[4].done()) {
+      for (int i = 0; i < 5; i++) {
+        check(!amplifier[i].done());
+        amplifier[i].provide_input(value);
+        auto state = amplifier[i].resume();
+        if (state == program::halt) goto done;
+        check(state == program::output);
+        value = amplifier[i].get_output();
+        amplifier[i].resume();
+      }
     }
+  done:
     if (value > max_signal) {
       max_signal = value;
       best_signal = signal;
@@ -225,8 +275,6 @@ int main(int argc, char* argv[]) {
     (scanner >> exact(",") >> values[n++]).check_ok();
   }
   const std::span program(begin(values), n);
-  // To benchmark: bin/day5 puzzles/day5benchmark.txt
-  std::cout << "part1 " << part1(program) << "\n";
-  //std::cout << "part1 " << run(program, 1) << '\n'
-  //          << "part2 " << run(program, 5) << '\n';
+  std::cout << "part1 " << part1(program) << "\n"
+            << "part2 " << part2(program) << "\n";
 }
