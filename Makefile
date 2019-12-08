@@ -40,5 +40,5 @@ build/build.o: src/build.cc
 
 -include build/depends.mk
 
-build/depends.mk: bin/build | build
-	$^ > $@
+build/depends.mk: bin/build $(shell find src -name '*.cc') | build
+	$< > $@
