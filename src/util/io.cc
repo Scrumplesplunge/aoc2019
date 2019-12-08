@@ -228,6 +228,15 @@ export class scanner {
     return *this;
   }
 
+  template <typename T, std::size_t count>
+  [[nodiscard]] scanner& operator>>(std::array<T, count>& a) {
+    if (error_.has_value()) return *this;
+    for (T& t : a) {
+      if (!(*this >> t)) break;
+    }
+    return *this;
+  }
+
   [[nodiscard]] scanner& operator>>(end_type) {
     if (error_.has_value()) return *this;
     *this >> whitespace;
