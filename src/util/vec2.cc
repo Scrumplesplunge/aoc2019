@@ -56,6 +56,11 @@ constexpr auto operator*(vec2<T> v, S s) {
   return vec2<T>{v.x * s, v.y * s};
 }
 
+export template <typename S, typename T>
+constexpr auto operator/(vec2<T> v, S s) {
+  return vec2<T>{v.x / s, v.y / s};
+}
+
 export template <typename T>
 constexpr bool operator==(vec2<T> a, vec2<T> b) {
   return a.x == b.x && a.y == b.y;
