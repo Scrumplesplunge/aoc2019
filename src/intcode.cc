@@ -108,9 +108,10 @@ export class program {
   static constexpr int max_size = 1000;
   using value_type = ::value_type;
   using buffer = std::array<value_type, max_size>;
+  using span = std::span<value_type>;
+  using const_span = std::span<const value_type>;
 
-  static std::span<const value_type> load(std::string_view source,
-                                          std::span<value_type> buffer) {
+  static const_span load(std::string_view source, span buffer) {
     check(!buffer.empty());
     scanner scanner(source);
     (scanner >> buffer[0]).check_ok();
@@ -124,7 +125,7 @@ export class program {
 
   program() = default;
 
-  explicit program(std::span<const value_type> source) {
+  explicit program(const_span source) {
     for (value_type i = 0, n = source.size(); i < n; i++) {
       memory_.emplace(i, source[i]);
     }
@@ -232,8 +233,7 @@ export class program {
     }
   }
 
-  std::span<value_type> run(std::span<const value_type> input,
-                            std::span<value_type> output) {
+  span run(const_span input, span output) {
     unsigned output_size = 0;
     while (true) {
       switch (resume()) {
