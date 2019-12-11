@@ -2,7 +2,8 @@
 
 #include <iostream>
 
-void check(bool condition, const char* file, int line, const char* message) {
+static inline void check(bool condition, const char* file, int line,
+                         const char* message) {
   if (!condition) {
     std::cerr << file << ':' << line << ": check failed: " << message << '\n';
     std::abort();

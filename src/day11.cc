@@ -5,6 +5,7 @@ import <span>;
 import <unordered_map>;
 import <unordered_set>;
 import io;
+import util.aabb;
 import util.vec2;
 
 constexpr int max_program_size = 1000;
@@ -318,16 +319,10 @@ int main(int argc, char* argv[]) {
   robot = {};
   robot.white_panels = {robot.position};
   robot.run(source);
-  vec2i min = {999'999'999, 999'999'999}, max = {-999'999'999, -999'999'999};
-  for (auto v : robot.white_panels) {
-    min.x = std::min(min.x, v.x);
-    min.y = std::min(min.y, v.y);
-    max.x = std::max(max.x, v.x);
-    max.y = std::max(max.y, v.y);
-  }
   std::cout << "part2:\n";
-  for (int y = min.y; y <= max.y; y++) {
-    for (int x = min.x; x <= max.x; x++) {
+  aabb<int> bounds(robot.white_panels);
+  for (int y = bounds.min.y; y <= bounds.max.y; y++) {
+    for (int x = bounds.min.x; x <= bounds.max.x; x++) {
       if (robot.white_panels.count({x, y})) {
         std::cout << "\x1b[37;1m1\x1b[0m";
       } else {
