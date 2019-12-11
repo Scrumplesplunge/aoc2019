@@ -3,7 +3,7 @@ import <array>;
 import <charconv>;  // BUG
 import <optional>;  // BUG
 import <span>;
-import io;
+import util.io;
 
 int run(std::span<const int> program, int x, int y) {
   std::array<int, 256> a;

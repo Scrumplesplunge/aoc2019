@@ -1,6 +1,6 @@
 import "util/check.h";
-import<fstream>;
-import<iostream>;
+import <fstream>;
+import <iostream>;
 
 int fuel(int mass) {
   int x = mass / 3 - 2;

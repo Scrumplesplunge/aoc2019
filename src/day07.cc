@@ -2,7 +2,7 @@ import "util/check.h";
 import <charconv>;  // bug
 import <optional>;  // bug
 import <span>;
-import io;
+import util.io;
 
 constexpr int max_program_size = 1000;
 

@@ -2,7 +2,7 @@ import "util/check.h";
 import <charconv>;  // bug
 import <optional>;  // bug
 import <string_view>;
-import io;
+import util.io;
 
 bool is_six_digit(int x) { return std::to_string(x).length() == 6; }
 auto password(int& x) { return matches<is_six_digit>(x, "6-digit password"); }

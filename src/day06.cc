@@ -2,7 +2,7 @@ import "util/check.h";
 import <array>;
 import <charconv>;  // bug
 import <optional>;  // bug
-import io;
+import util.io;
 
 auto object(std::string_view& s) {
   return sequence<is_alnum>(s, "object name");

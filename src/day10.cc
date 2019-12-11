@@ -6,7 +6,7 @@ import <numeric>;
 import <set>;
 import <span>;
 import <vector>;
-import io;
+import util.io;
 import util.vec2;
 
 using vec2b = vec2<signed char>;

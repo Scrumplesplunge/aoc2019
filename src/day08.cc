@@ -2,7 +2,7 @@ import "util/check.h";
 import <array>;
 import <charconv>;  // bug
 import <optional>;  // bug
-import io;
+import util.io;
 
 enum pixel : char { black, white, transparent };
 constexpr bool is_pixel(char c) {

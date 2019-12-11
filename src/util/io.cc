@@ -5,7 +5,7 @@ module;
 #include <sys/stat.h>
 #include <unistd.h>
 
-export module io;
+export module util.io;
 
 import <array>;
 import <charconv>;

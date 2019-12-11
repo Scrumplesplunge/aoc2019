@@ -1,7 +1,7 @@
 export module intcode;
 
 import "util/check.h";
-import io;
+import util.io;
 import <array>;
 import <charconv>;  // bug
 import <optional>;  // bug
