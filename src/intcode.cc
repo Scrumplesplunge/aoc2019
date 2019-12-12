@@ -1,3 +1,7 @@
+module;
+
+#include <cassert>
+
 export module intcode;
 
 import "util/check.h";

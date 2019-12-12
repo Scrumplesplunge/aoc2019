@@ -4,6 +4,8 @@ import <span>;
 import <unordered_map>;
 import <vector>;
 
+#include <cassert>
+
 enum opcode {
   add,  // arg is how much to add.
   move,  // arg is how far to move.

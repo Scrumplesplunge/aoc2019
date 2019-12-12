@@ -1,3 +1,7 @@
+module;
+
+#include <cassert>
+
 export module util.coroutine;
 
 import <chrono>;

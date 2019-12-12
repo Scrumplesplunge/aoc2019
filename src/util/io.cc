@@ -1,5 +1,6 @@
 module;
 
+#include <cassert>
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
