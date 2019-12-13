@@ -1,4 +1,5 @@
 CXX = clang++ -std=c++2a -stdlib=libc++ \
+			-I${HOME}/joe/src/clang/build/include \
 			-fimplicit-modules -fimplicit-module-maps \
 			-fmodules-cache-path=build \
 			-fprebuilt-module-path=build \
@@ -10,8 +11,9 @@ CXX = clang++ -std=c++2a -stdlib=libc++ \
 default: all
 
 CXXFLAGS = -g3
+LDFLAGS = -L${HOME}/joe/src/clang/build/lib
 opt: CXXFLAGS = -Ofast -ffunction-sections -fdata-sections -flto -DNDEBUG
-opt: LDFLAGS = -Wl,--gc-sections -s
+opt: LDFLAGS += -Wl,--gc-sections -s
 
 opt: all
 debug: all

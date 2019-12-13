@@ -109,7 +109,7 @@ op decode_op(value_type x) {
 
 export class program {
  public:
-  static constexpr int max_size = 1000;
+  static constexpr int max_size = 5000;
   using value_type = ::value_type;
   using buffer = std::array<value_type, max_size>;
   using span = std::span<value_type>;
