@@ -60,16 +60,15 @@ std::int64_t ore(const std::map<std::string_view, reaction>& reactions,
   // consumed as part of the construction of another dependent.
   for (int i = reactions.at("FUEL").stage; i > 1; i--) {
     std::map<std::string_view, std::int64_t> new_required;
-    for (const auto& [type, amount] : required) {
-      const auto& reaction = reactions.at(type);
-      std::int64_t repetitions = ceil_div(amount, reaction.output_quantity);
+    for (const auto& [output_type, output_quantity] : required) {
+      const auto& reaction = reactions.at(output_type);
       if (reaction.stage == i) {
-        for (const auto& [required_type, required_amount] :
-             reaction.requirements) {
-          new_required[required_type] += repetitions * required_amount;
+        auto repetitions = ceil_div(output_quantity, reaction.output_quantity);
+        for (const auto& [type, amount] : reaction.requirements) {
+          new_required[type] += repetitions * amount;
         }
       } else {
-        new_required[type] += amount;
+        new_required[output_type] += output_quantity;
       }
     }
     std::swap(required, new_required);
