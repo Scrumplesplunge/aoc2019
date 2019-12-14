@@ -1,17 +1,9 @@
 import "util/check.h";
 import <charconv>;  // bug
 import <iostream>;
-import <numeric>;
-import <optional>;  // bug
-import <set>;
 import <map>;
-import <span>;  // bug
 import <string_view>;
-import <type_traits>;  // bug
-import <vector>;
 import util.io;
-
-#include <cassert>
 
 struct reaction {
   std::string_view output_type;
@@ -19,7 +11,7 @@ struct reaction {
   std::map<std::string_view, int> requirements;
   // The stage is the longest dependency sequence between this element and ORE.
   // It is 1 for ORE itself, 2 for something immediately made from ORE, etc.
-  std::optional<int> stage;
+  int stage = 0;
 };
 
 auto element(std::string_view& out) {
@@ -50,24 +42,17 @@ std::int64_t ore(const std::map<std::string_view, reaction>& reactions,
   // Start at FUEL and work backwards in stage order. By doing it according to
   // stage we cover the case where one dependent of a given reaction can be
   // consumed as part of the construction of another dependent.
-  for (int i = *reactions.at("FUEL").stage; i > 1; i--) {
+  for (int i = reactions.at("FUEL").stage; i > 1; i--) {
     std::map<std::string_view, std::int64_t> new_required;
     for (const auto& [type, amount] : required) {
-      if (type == "ORE") {
-        new_required["ORE"] += amount;
-        continue;
-      }
       const auto& reaction = reactions.at(type);
       std::int64_t repetitions = ceil_div(amount, reaction.output_quantity);
-      if (*reaction.stage == i) {
+      if (reaction.stage == i) {
         for (const auto& [required_type, required_amount] :
              reaction.requirements) {
-          assert(required_type == "ORE" ||
-                 *reactions.at(required_type).stage < i);
           new_required[required_type] += repetitions * required_amount;
         }
       } else {
-        assert(*reaction.stage < i);
         new_required[type] += amount;
       }
     }
@@ -98,6 +83,7 @@ std::int64_t max_fuel(const std::map<std::string_view, reaction>& reactions,
 int main(int argc, char* argv[]) {
   scanner scanner(init(argc, argv));
   std::map<std::string_view, reaction> reactions;
+  reactions["ORE"].stage = 1;
   while (!scanner.done()) {
     reaction reaction;
     (scanner >> reaction).check_ok();
@@ -113,10 +99,8 @@ int main(int argc, char* argv[]) {
       int stage = 0;
       bool missing_requirement = false;
       for (const auto& [input, amount] : reaction.requirements) {
-        if (input == "ORE") {
-          stage = std::max(stage, 2);
-        } else if (reactions.at(input).stage) {
-          stage = std::max(stage, 1 + *reactions.at(input).stage);
+        if (reactions.at(input).stage) {
+          stage = std::max(stage, 1 + reactions.at(input).stage);
         } else {
           missing_requirement = true;
           break;
