@@ -2,6 +2,7 @@ import "util/check.h";
 import <charconv>;  // bug
 import <iostream>;
 import <map>;
+import <numeric>;
 import <string_view>;
 import util.io;
 
@@ -29,6 +30,21 @@ scanner& operator>>(scanner& s, reaction& r) {
     r.requirements.emplace(type, quantity);
   }
   return s >> exact("=>") >> r.output_quantity >> element(r.output_type);
+}
+
+// Populate reactions[name].stage and return the result.
+int calculate_stage(std::map<std::string_view, reaction>& reactions,
+                    std::string_view name) {
+  auto& reaction = reactions.at(name);
+  if (!reaction.stage) {
+    reaction.stage =
+        1 + std::transform_reduce(
+                std::begin(reaction.requirements),
+                std::end(reaction.requirements), 0,
+                [](int a, int b) { return std::max(a, b); },
+                [&](auto& x) { return calculate_stage(reactions, x.first); });
+  }
+  return reaction.stage;
 }
 
 constexpr std::int64_t ceil_div(std::int64_t a, std::int64_t b) {
@@ -91,27 +107,7 @@ int main(int argc, char* argv[]) {
   }
 
   // Compute the stage for each reaction.
-  bool missing_stage;
-  do {
-    missing_stage = false;
-    for (auto& [type, reaction] : reactions) {
-      if (reaction.stage) continue;
-      int stage = 0;
-      bool missing_requirement = false;
-      for (const auto& [input, amount] : reaction.requirements) {
-        if (reactions.at(input).stage) {
-          stage = std::max(stage, 1 + reactions.at(input).stage);
-        } else {
-          missing_requirement = true;
-          break;
-        }
-      }
-      if (!missing_requirement) {
-        missing_stage = true;
-        reaction.stage = stage;
-      }
-    }
-  } while (missing_stage);
+  for (auto& [name, reaction] : reactions) calculate_stage(reactions, name);
 
   std::cout << "part1 " << ore(reactions, 1) << '\n';
   std::cout << "part2 " << max_fuel(reactions, 1'000'000'000'000) << '\n';
