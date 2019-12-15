@@ -107,6 +107,25 @@ op decode_op(value_type x) {
   return ops[x];
 }
 
+class memory {
+ public:
+  value_type& operator[](value_type index) {
+    return chunks_[index / chunk_size][index % chunk_size];
+  }
+
+  value_type& at(value_type index) {
+    return chunks_.at(index / chunk_size)[index % chunk_size];
+  }
+
+  const value_type& at(value_type index) const {
+    return chunks_.at(index / chunk_size)[index % chunk_size];
+  }
+
+ private:
+  static constexpr int chunk_size = 1024;
+  std::unordered_map<value_type, std::array<value_type, chunk_size>> chunks_;
+};
+
 export class program {
  public:
   static constexpr int max_size = 5000;
@@ -131,7 +150,7 @@ export class program {
 
   explicit program(const_span source) {
     for (value_type i = 0, n = source.size(); i < n; i++) {
-      memory_.emplace(i, source[i]);
+      memory_[i] = source[i];
     }
   }
 
@@ -161,9 +180,7 @@ export class program {
   state resume() {
     check(state_ == ready);
     while (true) {
-      check(0 <= pc_ && pc_ < (int)memory_.size());
       const auto op = decode_op(memory_[pc_]);
-      check(pc_ + op_size(op.code) <= (int)memory_.size());
       auto get = [&](int param_index) {
         value_type x = memory_[pc_ + param_index + 1];
         switch (op.params[param_index]) {
@@ -261,5 +278,5 @@ export class program {
  private:
   state state_ = ready;
   value_type pc_ = 0, input_address_ = 0, output_ = 0, relative_base_ = 0;
-  std::unordered_map<value_type, value_type> memory_;
+  memory memory_;
 };
