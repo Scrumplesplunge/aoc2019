@@ -22,7 +22,6 @@ constexpr bool by_distance(const state& left, const state& right) {
 }
 
 enum move { failure = 0, success = 1, found_objective = 2 };
-enum type : char { empty = '.', wall = '#', objective = '*' };
 enum direction { north = 1, south = 2, west = 3, east = 4 };
 
 constexpr vec2i move(vec2i v, direction d) {
@@ -34,42 +33,53 @@ constexpr vec2i move(vec2i v, direction d) {
   }
 }
 
-void show_state(const std::unordered_map<vec2i, type>& cells) {
-  if (cells.empty()) return;
-  vec2i min = cells.begin()->first, max = min;
-  for (const auto [v, t] : cells) {
-    min.x = std::min(min.x, v.x);
-    min.y = std::min(min.y, v.y);
-    max.x = std::max(max.x, v.x);
-    max.y = std::max(max.y, v.y);
+state find_objective(program::const_span source) {
+  std::unordered_set<vec2i> explored;
+  std::vector<state> work;  // priority queue of states, by min distance.
+  {
+    state initial = {0, {0, 0}, program(source)};
+    check(initial.brain.resume() == program::waiting_for_input);
+    work.push_back(std::move(initial));
   }
-  for (int y = min.y; y <= max.y; y++) {
-    for (int x = min.x; x <= max.x; x++) {
-      auto i = cells.find({x, y});
-      std::cout << (i == cells.end() ? empty : i->second);
+
+  while (true) {
+    check(!work.empty());
+    std::pop_heap(std::begin(work), std::end(work), by_distance);
+    state current = std::move(work.back());
+    work.pop_back();
+    if (!explored.insert(current.position).second) continue;
+    for (int i = 1; i <= 4; i++) {
+      const vec2i position = move(current.position, direction(i));
+      const auto distance = current.distance_travelled + 1;
+      if (explored.contains(position)) continue;  // already explored.
+      state next = {distance, position, current.brain};
+      next.brain.provide_input(i);
+      check(next.brain.resume() == program::output);
+      auto x = next.brain.get_output();
+      check(0 <= x && x <= 2);
+      if (x == found_objective) return next;
+      check(next.brain.resume() == program::waiting_for_input);
+      // If the response was failure then there is a wall and we can't explore
+      // in that cell.
+      if (x != failure) work.push_back(std::move(next));
+      std::push_heap(std::begin(work), std::end(work), by_distance);
     }
-    std::cout << '\n';
   }
 }
 
-int explore(state initial) {
+// Explore all reachable cells and establish which one is furthest from the
+// oxygen generator.
+int max_distance(state initial) {
   std::unordered_set<vec2i> explored;
-  std::unordered_map<vec2i, type> cells;
   std::vector<state> work;
   check(initial.brain.resume() == program::waiting_for_input);
   initial.distance_travelled = 0;
   work.push_back(std::move(initial));
 
-  int x = 0;
   int max_distance = 0;
   while (!work.empty()) {
     std::pop_heap(std::begin(work), std::end(work), by_distance);
     state current = std::move(work.back());
-    if (++x % 1'000 == 0) {
-      std::cout << "\rwork.size() = " << work.size() << "  explored.size() = "
-                << explored.size() << "  distance = "
-                << current.distance_travelled << "\n";
-    }
     work.pop_back();
     if (!explored.insert(current.position).second) continue;
     max_distance = std::max(max_distance, current.distance_travelled);
@@ -79,68 +89,15 @@ int explore(state initial) {
       if (explored.contains(position)) continue;
       state next = {distance, position, current.brain};
       next.brain.provide_input(i);
-      program::state s;
-      for (s = next.brain.resume(); s == program::output;
-           s = next.brain.resume()) {
-        switch (auto x = next.brain.get_output(); x) {
-          case failure: cells.emplace(position, wall); break;
-          case success: cells.emplace(position, empty); break;
-          case found_objective: cells.emplace(position, objective); break;
-          default: std::cout << "ignoring " << x << '\n';
-        }
-      }
-      check(s == program::waiting_for_input);
-      if (cells.at(position) == empty) work.push_back(std::move(next));
+      check(next.brain.resume() == program::output);
+      auto x = next.brain.get_output();
+      check(0 <= x && x <= 2);
+      check(next.brain.resume() == program::waiting_for_input);
+      if (x != failure) work.push_back(std::move(next));
       std::push_heap(std::begin(work), std::end(work), by_distance);
     }
   }
   return max_distance;
-}
-
-state find_objective(program::const_span source) {
-  std::unordered_map<vec2i, type> cells;
-  std::unordered_set<vec2i> explored;
-  std::vector<state> work;
-  {
-    state initial = {0, {0, 0}, program(source)};
-    check(initial.brain.resume() == program::waiting_for_input);
-    work.push_back(std::move(initial));
-  }
-
-  int x = 0;
-  while (true) {
-    check(!work.empty());
-    std::pop_heap(std::begin(work), std::end(work), by_distance);
-    state current = std::move(work.back());
-    if (++x % 1'000 == 0) {
-      std::cout << "\rwork.size() = " << work.size() << "  explored.size() = "
-                << explored.size() << "  distance = "
-                << current.distance_travelled << "\n";
-      show_state(cells);
-    }
-    work.pop_back();
-    if (!explored.insert(current.position).second) continue;
-    for (int i = 1; i <= 4; i++) {
-      const vec2i position = move(current.position, direction(i));
-      const auto distance = current.distance_travelled + 1;
-      if (explored.contains(position)) continue;
-      state next = {distance, position, current.brain};
-      next.brain.provide_input(i);
-      program::state s;
-      for (s = next.brain.resume(); s == program::output;
-           s = next.brain.resume()) {
-        switch (auto x = next.brain.get_output(); x) {
-          case failure: cells.emplace(position, wall); break;
-          case success: cells.emplace(position, empty); break;
-          case found_objective: return next; break;
-          default: std::cout << "ignoring " << x << '\n';
-        }
-      }
-      check(s == program::waiting_for_input);
-      if (cells.at(position) == empty) work.push_back(std::move(next));
-      std::push_heap(std::begin(work), std::end(work), by_distance);
-    }
-  }
 }
 
 int main(int argc, char* argv[]) {
@@ -149,5 +106,5 @@ int main(int argc, char* argv[]) {
 
   auto part1 = find_objective(source);
   std::cout << "part1 " << part1.distance_travelled << '\n';
-  std::cout << "part2 " << explore(std::move(part1)) << '\n';
+  std::cout << "part2 " << max_distance(std::move(part1)) << '\n';
 }
