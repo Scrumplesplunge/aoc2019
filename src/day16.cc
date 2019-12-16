@@ -21,7 +21,7 @@ std::vector<digit> step(std::span<const digit> values, int offset = 0) {
   cumulative[0] = 0;
   for (int i = 0; i < n; i++) cumulative[i + 1] = cumulative[i] + values[i];
   auto sum = [&](int i, int j) {
-    return cumulative[std::clamp(j, 0, n)] - cumulative[std::clamp(i, 0, n)];
+    return cumulative[std::min(j, n)] - cumulative[std::min(i, n)];
   };
   std::vector<digit> output(n);
   for (int i = 0; i < n; i++) {
