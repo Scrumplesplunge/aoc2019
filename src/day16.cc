@@ -17,15 +17,6 @@ scanner& operator>>(scanner& s, digit& d) {
   return s;
 }
 
-std::vector<digit> input(std::span<const digit> values, int repeat = 1) {
-  std::vector<digit> output;
-  output.reserve(values.size() * repeat);
-  for (int i = 0; i < repeat; i++) {
-    output.insert(output.end(), values.begin(), values.end());
-  }
-  return output;
-}
-
 std::vector<digit> step(std::span<const digit> values, int offset = 0) {
   const int n = values.size();
   std::vector<int> cumulative(n + 1);
@@ -47,10 +38,9 @@ std::vector<digit> step(std::span<const digit> values, int offset = 0) {
   return output;
 }
 
-std::vector<digit> fft(
-    std::span<const digit> values, int iterations, int offset = 0) {
+std::vector<digit> fft(std::span<const digit> values, int offset = 0) {
   auto output = step(values, offset);
-  for (int i = 1; i < iterations; i++) output = step(output, offset);
+  for (int i = 1; i < 100; i++) output = step(output, offset);
   return output;
 }
 
@@ -69,16 +59,23 @@ int index(std::span<const digit> values) {
   return index;
 }
 
-// wa 50924767 - "too high"
 int main(int argc, char* argv[]) {
   scanner scanner(init(argc, argv));
   std::array<digit, 1000> buffer;
   std::span<digit> values = buffer;
   (scanner >> values >> scanner::end).check_ok();
-  std::cout << "part1 " << code(fft(values, 100)) << '\n';
-  auto initial = input(values, 10'000);
-  int offset = index(initial);
-  auto shortened = std::span<const digit>(initial).subspan(offset);
-  auto part2 = fft(shortened, 100, offset);
+
+  std::cout << "part1 " << code(fft(values)) << '\n';
+
+  std::vector<digit> input;
+  input.reserve(values.size() * 10'000);
+  for (int i = 0; i < 10'000; i++) {
+    input.insert(input.end(), values.begin(), values.end());
+  }
+  // We never need to compute any values before the index of the output, since
+  // the update sequence only ever needs values that come after it.
+  int offset = index(input);
+  auto shortened = std::span<const digit>(input).subspan(offset);
+  auto part2 = fft(shortened, offset);
   std::cout << "part2 " << code(part2) << '\n';
 }
