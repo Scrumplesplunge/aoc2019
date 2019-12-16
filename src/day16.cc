@@ -55,18 +55,20 @@ int main(int argc, char* argv[]) {
 
   std::cout << "part1 " << fft(values) << '\n';
 
-  std::vector<digit> input;
-  input.reserve(values.size() * 10'000);
-  for (int i = 0; i < 10'000; i++) {
-    input.insert(input.end(), values.begin(), values.end());
-  }
   // Compute the offset of the output.
-  check(input.size() >= 7);
+  check(values.size() >= 7);
   int offset = 0;
   for (int i = 0; i < 7; i++) offset = 10 * offset + values[i];
-  check(0 <= offset && offset + 8 <= (int)input.size());
+  check(0 <= offset && offset + 8 <= 10'000 * (int)values.size());
+
   // We never need to compute any values before the index of the output, since
   // the update sequence only ever needs values that come after it.
-  auto shortened = std::span<const digit>(input).subspan(offset);
-  std::cout << "part2 " << fft(shortened, offset) << '\n';
+  std::vector<digit> input;
+  input.reserve(10'000 * values.size() - offset);
+  input.insert(
+      input.end(), values.begin() + offset % values.size(), values.end());
+  for (int i = offset / values.size() + 1; i < 10'000; i++) {
+    input.insert(input.end(), values.begin(), values.end());
+  }
+  std::cout << "part2 " << fft(input, offset) << '\n';
 }
