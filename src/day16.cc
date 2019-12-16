@@ -38,25 +38,13 @@ std::vector<digit> step(std::span<const digit> values, int offset = 0) {
   return output;
 }
 
-std::vector<digit> fft(std::span<const digit> values, int offset = 0) {
+std::string fft(std::span<const digit> values, int offset = 0) {
   auto output = step(values, offset);
   for (int i = 1; i < 100; i++) output = step(output, offset);
-  return output;
-}
-
-std::string code(std::span<const digit> values) {
-  check(values.size() >= 8);
-  std::string output;
-  for (int i = 0; i < 8; i++) output.push_back((char)values[i] + '0');
-  return output;
-}
-
-int index(std::span<const digit> values) {
-  check(values.size() >= 7);
-  int index = 0;
-  for (int i = 0; i < 7; i++) index = 10 * index + values[i];
-  check(0 <= index && index + 8 <= (int)values.size());
-  return index;
+  check(output.size() >= 8);
+  std::string code;
+  for (int i = 0; i < 8; i++) code.push_back((char)output[i] + '0');
+  return code;
 }
 
 int main(int argc, char* argv[]) {
@@ -65,17 +53,20 @@ int main(int argc, char* argv[]) {
   std::span<digit> values = buffer;
   (scanner >> values >> scanner::end).check_ok();
 
-  std::cout << "part1 " << code(fft(values)) << '\n';
+  std::cout << "part1 " << fft(values) << '\n';
 
   std::vector<digit> input;
   input.reserve(values.size() * 10'000);
   for (int i = 0; i < 10'000; i++) {
     input.insert(input.end(), values.begin(), values.end());
   }
+  // Compute the offset of the output.
+  check(input.size() >= 7);
+  int offset = 0;
+  for (int i = 0; i < 7; i++) offset = 10 * offset + values[i];
+  check(0 <= offset && offset + 8 <= (int)input.size());
   // We never need to compute any values before the index of the output, since
   // the update sequence only ever needs values that come after it.
-  int offset = index(input);
   auto shortened = std::span<const digit>(input).subspan(offset);
-  auto part2 = fft(shortened, offset);
-  std::cout << "part2 " << code(part2) << '\n';
+  std::cout << "part2 " << fft(shortened, offset) << '\n';
 }
