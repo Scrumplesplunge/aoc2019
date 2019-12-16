@@ -24,14 +24,22 @@ std::vector<digit> step(std::span<const digit> values, int offset = 0) {
     return cumulative[std::min(j, n)] - cumulative[std::min(i, n)];
   };
   std::vector<digit> output(n);
-  for (int i = 0; i < n; i++) {
-    int total = 0;
-    int multiplier = offset + i + 1;
-    for (int j = i; j < n; j += 4 * multiplier) {
-      total += sum(j, j + multiplier);
-      total -= sum(j + 2 * multiplier, j + 3 * multiplier);
+  if ((int)values.size() < offset) {
+    // Fast path: every calculation is just the sum of all subsequent values.
+    for (int i = 0; i < n; i++) {
+      int total = sum(i, n);
+      output[i] = digit(total % 10);
     }
-    output[i] = digit((total < 0 ? -total : total) % 10);
+  } else {
+    for (int i = 0; i < n; i++) {
+      int total = 0;
+      int multiplier = offset + i + 1;
+      for (int j = i; j < n; j += 4 * multiplier) {
+        total += sum(j, j + multiplier);
+        total -= sum(j + 2 * multiplier, j + 3 * multiplier);
+      }
+      output[i] = digit((total < 0 ? -total : total) % 10);
+    }
   }
   return output;
 }
