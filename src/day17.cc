@@ -57,22 +57,6 @@ direction robot_direction(cell c) {
   }
 }
 
-int part1(const grid& grid) {
-  int total = 0;
-  for (int y = 0; y < grid_height; y++) {
-    for (int x = 0; x < grid_width; x++) {
-      if (grid[y][x] == empty) continue;
-      const int paths = count_paths(grid, x, y);
-      // We assume that lines always fully cross for part 2.
-      check(paths != 3);  ;
-      if (paths > 2) {
-        total += x * y;
-      }
-    }
-  }
-  return total;
-}
-
 vec2i find_robot(const grid& grid) {
   for (int y = 0; y < grid_height; y++) {
     for (int x = 0; x < grid_width; x++) {
@@ -128,6 +112,8 @@ turn compute_turn(const grid& grid, int x, int y, direction direction) {
   }
 }
 
+// Compute the sequence of moves necessary to explore the grid. The output has
+// only single-unit movements.
 std::span<move> compute_moves(const grid& grid, std::span<move> output) {
   auto [x, y] = find_robot(grid);
   check(count_paths(grid, x, y) == 1);
@@ -175,6 +161,7 @@ std::span<move> compute_moves(const grid& grid, std::span<move> output) {
   return output.subspan(0, moves);
 }
 
+// Encode a sequence of moves, combining consecutive moves into aggregated ones.
 std::span<move> encode(std::span<const move> moves, std::span<move> output) {
   int length = 0;
   int i = 0, n = moves.size();
@@ -197,6 +184,8 @@ std::span<move> encode(std::span<const move> moves, std::span<move> output) {
   return output.first(length);
 }
 
+// Given a sequence of moves and three routines, encode the sequence of moves
+// as calls to the routines. If this is not possible, returns an empty span.
 std::span<move> encode(std::span<const move> moves,
                        std::span<const move> a,
                        std::span<const move> b,
@@ -231,7 +220,9 @@ struct compile_result {
   std::span<move> a, b, c, main;
 };
 
-std::optional<compile_result> compile(
+// Compiles a sequence of moves into three routines and a main routine which
+// uses them.
+compile_result compile(
     std::span<const move> moves, std::span<move> a, std::span<move> b,
     std::span<move> c, std::span<move> main) {
   compile_result result;
@@ -274,7 +265,8 @@ std::optional<compile_result> compile(
       if (!has_sequence(temp_a, b_start)) break;
     }
   }
-  return std::nullopt;
+  std::cerr << "Failed to encode the program.\n";
+  std::abort();
 }
 
 std::string format(const compile_result& result) {
@@ -287,22 +279,34 @@ std::string format(const compile_result& result) {
   return output;
 }
 
+int part1(const grid& grid) {
+  int total = 0;
+  for (int y = 0; y < grid_height; y++) {
+    for (int x = 0; x < grid_width; x++) {
+      if (grid[y][x] == empty) continue;
+      const int paths = count_paths(grid, x, y);
+      // We assume that lines always fully cross for part 2.
+      check(paths != 3);  ;
+      if (paths > 2) total += x * y;
+    }
+  }
+  return total;
+}
+
 int part2(const grid& grid, program::span source) {
   move move_buffer[1000];
   auto moves = compute_moves(grid, move_buffer);
 
-  move a_buffer[20], b_buffer[20], c_buffer[20], main_buffer[20];
-  auto result = compile(moves, a_buffer, b_buffer, c_buffer, main_buffer);
-  check(result.has_value());
-  auto commands = format(*result);
-  program::value_type input_buffer[1000];
-  check(commands.size() <= 1000);
+  move a[20], b[20], c[20], main[20];
+  auto commands = format(compile(moves, a, b, c, main));
+  check(commands.size() <= 100);
+  program::value_type input_buffer[100];
   std::copy(commands.begin(), commands.end(), std::begin(input_buffer));
 
   check(!source.empty());
   source[0] = 2;
   program brain(source);
-  program::value_type output_buffer[10000];
+  program::value_type output_buffer[5000];
   auto output = brain.run(program::const_span(input_buffer, commands.size()),
                           output_buffer);
 
