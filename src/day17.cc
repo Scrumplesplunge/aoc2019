@@ -40,12 +40,10 @@ grid read_grid(program::const_span program_output) {
   for (int y = 0; y < grid_height; y++) {
     for (int x = 0; x < grid_width; x++) {
       auto value = program_output[(grid_width + 1) * y + x];
-      std::cout << (char)value << std::flush;
       check(is_grid_cell(value));
       grid[y][x] = cell(value);
     }
     check(program_output[(grid_width + 1) * y + grid_width] == '\n');
-    std::cout << '\n';
   }
   return grid;
 }
@@ -230,10 +228,7 @@ std::span<move> encode(std::span<const move> moves,
   };
   int length = 0;
   while (i < n) {
-    if (length == (int)main.size()) {
-      std::cout << "\rtoo long at i=" << i << ", n=" << n << "  " << std::flush;
-      return {};
-    }
+    if (length == (int)main.size()) return {};
     if (starts_with(a)) {
       i += a.size();
       main[length++] = call_a;
@@ -244,7 +239,6 @@ std::span<move> encode(std::span<const move> moves,
       i += c.size();
       main[length++] = call_c;
     } else {
-      std::cout << "\rmismatch at i=" << i << ", n=" << n << "  " << std::flush;
       return {};
     }
   }
@@ -258,15 +252,7 @@ struct compile_result {
 std::optional<compile_result> compile(
     std::span<const move> moves, std::span<move> a, std::span<move> b,
     std::span<move> c, std::span<move> main) {
-  std::cout << "input:\n";
-  std::string temp;
-  print(temp, moves);
-  std::cout << temp;
-
   compile_result result;
-  //std::string temp;
-  //print(temp, moves);
-  //std::cout << "moves: " << temp << '\n';
   auto has_sequence = [&](std::span<const move> sequence, int i) {
     return (int)sequence.size() <= (int)moves.size() - i &&
            std::equal(sequence.begin(), sequence.end(), moves.begin() + i);
@@ -275,52 +261,35 @@ std::optional<compile_result> compile(
     std::span<const move> temp_a = moves.subspan(0, i);
     result.a = encode(temp_a, a);
     if (result.a.empty()) break;
-    //std::string temp;
-    //print(temp, temp_a);
-    //std::cout << "input a: " << temp << '\n';
-    //temp.clear();
-    //print(temp, result.a);
-    //std::cout << "output a: " << temp << '\n';
     
-    // allow for repetitions of A before B.
+    // Allow for repetitions of A before B.
     int b_start = i;
-    while (has_sequence(temp_a, b_start)) b_start += i;
+    while (true) {
+      for (int j = 1, j_max = moves.size() - b_start; j <= j_max; j++) {
+        std::span<const move> temp_b = moves.subspan(b_start, j);
+        result.b = encode(temp_b, b);
+        if (result.b.empty()) break;
 
-    for (int j = 1, j_max = moves.size() - b_start; j <= j_max; j++) {
-      std::span<const move> temp_b = moves.subspan(b_start, j);
-      result.b = encode(temp_b, b);
-      if (result.b.empty()) break;
-      //std::string temp;
-      //print(temp, temp_b);
-      //std::cout << "input b: " << temp << '\n';
-      //temp.clear();
-      //print(temp, result.b);
-      //std::cout << "output b: " << temp << '\n';
-    
-      // allow for repetitions of A or B before C.
-      int c_start = b_start + j;
-      while (true) {
-        if (has_sequence(temp_a, c_start)) {
-          c_start += temp_a.size();
-          continue;
-        } else if (has_sequence(temp_b, c_start)) {
-          c_start += temp_b.size();
-          continue;
-        } else break;
+        int c_start = b_start + j;
+        while (true) {
+          for (int k = 1, k_max = moves.size() - c_start; k <= k_max; k++) {
+            std::span<const move> temp_c = moves.subspan(c_start, k);
+            result.c = encode(temp_c, c);
+            if (result.c.empty()) break;
+            result.main = encode(moves, temp_a, temp_b, temp_c, main);
+            if (!result.main.empty()) return result;
+          }
+          // Allow for repetitions of A or B before C.
+          if (has_sequence(temp_a, c_start)) {
+            c_start += temp_a.size();
+            continue;
+          } else if (has_sequence(temp_b, c_start)) {
+            c_start += temp_b.size();
+            continue;
+          } else break;
+        }
       }
-      for (int k = 1, k_max = moves.size() - c_start; k <= k_max; k++) {
-        std::span<const move> temp_c = moves.subspan(c_start, k);
-        result.c = encode(temp_c, c);
-        if (result.c.empty()) break;
-        //std::string temp;
-        //print(temp, temp_c);
-        //std::cout << "input c: " << temp << '\n';
-        //temp.clear();
-        //print(temp, result.c);
-        //std::cout << "output c: " << temp << '\n';
-        result.main = encode(moves, temp_a, temp_b, temp_c, main);
-        if (!result.main.empty()) return result;
-      }
+      if (!has_sequence(temp_a, b_start)) break;
     }
   }
   return std::nullopt;
@@ -344,8 +313,6 @@ int part2(const grid& grid, program::span source) {
   auto result = compile(moves, a_buffer, b_buffer, c_buffer, main_buffer);
   check(result.has_value());
   auto commands = format(*result);
-  std::cout << "commands:\n" << commands;
-
   program::value_type input_buffer[1000];
   check(commands.size() <= 1000);
   std::copy(commands.begin(), commands.end(), std::begin(input_buffer));
