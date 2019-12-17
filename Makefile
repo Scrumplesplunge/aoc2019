@@ -1,5 +1,7 @@
-CXX = clang++ -std=c++2a -stdlib=libc++ \
-			-I${HOME}/joe/src/clang/build/include \
+# CLANG_PREFIX = ${HOME}/src/clang/build
+
+CXX = ${CLANG_PREFIX}/bin/clang++ -std=c++2a -stdlib=libc++ \
+			-I${CLANG_PREFIX}/include \
 			-fimplicit-modules -fimplicit-module-maps \
 			-fmodules-cache-path=build \
 			-fprebuilt-module-path=build \
@@ -8,39 +10,50 @@ CXX = clang++ -std=c++2a -stdlib=libc++ \
 .PHONY: default opt debug all clean
 .PRECIOUS: build/build.o
 
-default: all
+default: debug
 
-CXXFLAGS = -g3
-LDFLAGS = -L${HOME}/joe/src/clang/build/lib
-opt: CXXFLAGS = -Ofast -ffunction-sections -fdata-sections -flto -DNDEBUG
-opt: LDFLAGS += -Wl,--gc-sections -s
+BASE_CXXFLAGS = -g3
+DEBUG_CXXFLAGS = -fmodules-cache-path=build/debug  \
+								 -fprebuilt-module-path=build/debug
+OPT_CXXFLAGS = -fmodules-cache-path=build/opt  \
+							 -fprebuilt-module-path=build/opt  \
+							 -Ofast -ffunction-sections -fdata-sections -flto -DNDEBUG
 
-opt: all
-debug: all
+BASE_LDFLAGS = -L${CLANG_PREFIX}/lib -Wl,-rpath,${CLANG_PREFIX}/lib
+DEBUG_LDFLAGS =
+OPT_LDFLAGS = -Wl,--gc-sections -s
 
 clean:
 	rm -rf bin build
 
 MKBMI = ${CXX} -Xclang -emit-module-interface
 
-bin:
-	mkdir -p bin
+bin bin/opt bin/debug build build/opt build/debug:
+	mkdir -p $@
 
-build:
-	mkdir -p build
+build/debug/%.pcm: | build/debug
+	${MKBMI} ${BASE_CXXFLAGS} ${DEBUG_CXXFLAGS} -c $< -o $@
 
-build/%.pcm: | build
-	${MKBMI} ${CXXFLAGS} -c $< -o $@
+build/opt/%.pcm: | build/opt
+	${MKBMI} ${BASE_CXXFLAGS} ${OPT_CXXFLAGS} -c $< -o $@
 
-build/%.o: | build
-	${CXX} ${CXXFLAGS} -c $< -o $@
+build/debug/%.o: | build/debug
+	${CXX} ${BASE_CXXFLAGS} ${DEBUG_CXXFLAGS} -c $< -o $@
 
-bin/%: build/%.o | bin
-	${CXX} ${CXXFLAGS} $^ ${LDFLAGS} -o $@
+build/opt/%.o: | build/opt
+	${CXX} ${BASE_CXXFLAGS} ${OPT_CXXFLAGS} -c $< -o $@
 
-build/build.o: src/build.cc
+bin/debug/%: build/debug/%.o | bin/debug
+	${CXX} ${BASE_CXXFLAGS} ${DEBUG_CXXFLAGS} $^ ${BASE_LDFLAGS}  \
+		     ${DEBUG_LDFLAGS} -o $@
+
+bin/opt/%: build/opt/%.o | bin/opt
+	${CXX} ${BASE_CXXFLAGS} ${OPT_CXXFLAGS} $^ ${BASE_LDFLAGS}  \
+		     ${OPT_LDFLAGS} -o $@
+
+build/debug/build.o: src/build.cc
 
 -include build/depends.mk
 
-build/depends.mk: bin/build $(shell find src -name '*.cc') | build
+build/depends.mk: bin/debug/build $(shell find src -name '*.cc')
 	$< > $@
