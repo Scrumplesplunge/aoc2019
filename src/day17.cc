@@ -79,25 +79,17 @@ enum call { call_a, call_b, call_c };
 using move = std::variant<turn, go, call>;
 
 template <typename... Ts>
-struct overload : Ts... {
-  using Ts::operator()...;
-};
-
-template <typename... Ts>
-overload(Ts...) -> overload<Ts...>;
-
-void print(std::string& output, move m) {
-  std::visit(overload{
-    [&](turn t) { output += t == turn::left ? 'L' : 'R'; },
-    [&](call c) { output += 'A' + c; },
-    [&](go g) { output += std::to_string((int)g); },
-  }, m);
-}
+struct overload : Ts... { using Ts::operator()...; };
+template <typename... Ts> overload(Ts...) -> overload<Ts...>;
 
 void print(std::string& output, std::span<const move> moves) {
   if (moves.empty()) return;
-  for (auto step : moves) {
-    print(output, step);
+  for (auto move : moves) {
+    std::visit(overload{
+      [&](turn t) { output += t == turn::left ? 'L' : 'R'; },
+      [&](call c) { output += 'A' + c; },
+      [&](go g) { output += std::to_string((int)g); },
+    }, move);
     output += ',';
   }
   output.back() = '\n';
