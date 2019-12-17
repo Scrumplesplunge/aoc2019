@@ -134,7 +134,7 @@ export class program {
   using span = std::span<value_type>;
   using const_span = std::span<const value_type>;
 
-  static const_span load(std::string_view source, span buffer) {
+  static span load(std::string_view source, span buffer) {
     check(!buffer.empty());
     scanner scanner(source);
     (scanner >> buffer[0]).check_ok();
