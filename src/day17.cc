@@ -31,23 +31,6 @@ constexpr bool is_grid_cell(program::value_type c) {
 constexpr int grid_width = 37, grid_height = 33;
 using grid = std::array<std::array<cell, grid_width>, grid_height>;
 
-grid read_grid(program::const_span program_output) {
-  check(!program_output.empty());
-  check(program_output.back() == '\n');
-  check(program_output.size() == 1 + (1 + grid_width) * grid_height);
-  // Translate the grid into a map.
-  grid grid;
-  for (int y = 0; y < grid_height; y++) {
-    for (int x = 0; x < grid_width; x++) {
-      auto value = program_output[(grid_width + 1) * y + x];
-      check(is_grid_cell(value));
-      grid[y][x] = cell(value);
-    }
-    check(program_output[(grid_width + 1) * y + grid_width] == '\n');
-  }
-  return grid;
-}
-
 auto get(const grid& grid, int x, int y) {
   if (x < 0 || grid_width <= x || y < 0 || grid_height <= y) return empty;
   return grid[y][x];
@@ -62,17 +45,6 @@ int count_paths(const grid& grid, int x, int y) {
 }
 
 enum direction { up, right, down, left };
-direction path_direction(const grid& grid, int x, int y) {
-  check(count_paths(grid, x, y) == 1);
-  const auto up = get(grid, x, y - 1),
-             left = get(grid, x - 1, y),
-             right = get(grid, x + 1, y);
-  if (up != empty) return direction::up;
-  if (left != empty) return direction::left;
-  if (right != empty) return direction::right;
-  return direction::down;
-}
-
 direction robot_direction(cell c) {
   switch (c) {
     case robot_up: return up;
@@ -164,7 +136,17 @@ std::span<move> compute_moves(const grid& grid, std::span<move> output) {
     check(moves < (int)output.size());
     output[moves++] = m;
   };
-  direction robot = path_direction(grid, x, y);
+  direction robot;
+  {
+    check(count_paths(grid, x, y) == 1);
+    const auto up = get(grid, x, y - 1),
+               left = get(grid, x - 1, y),
+               right = get(grid, x + 1, y);
+    robot = up != empty ? direction::up
+          : left != empty ? direction::left
+          : right != empty ? direction::right
+          : direction::down;
+  }
   // Turn the robot to face down the path.
   int turn = (4 + robot - robot_direction(grid[y][x])) % 4;
   switch (turn) {
@@ -332,8 +314,22 @@ int main(int argc, char* argv[]) {
   program::buffer program_buffer;
   const auto source = program::load(init(argc, argv), program_buffer);
 
-  program::value_type buffer[10000];
-  auto grid = read_grid(program(source).run({}, buffer));
+  program::value_type grid_buffer[2000];
+  auto program_output = program(source).run({}, grid_buffer);
+  check(!program_output.empty());
+  check(program_output.back() == '\n');
+  check(program_output.size() == 1 + (1 + grid_width) * grid_height);
+  // Translate the grid into a map.
+  grid grid;
+  for (int y = 0; y < grid_height; y++) {
+    for (int x = 0; x < grid_width; x++) {
+      auto value = program_output[(grid_width + 1) * y + x];
+      check(is_grid_cell(value));
+      grid[y][x] = cell(value);
+    }
+    check(program_output[(grid_width + 1) * y + grid_width] == '\n');
+  }
+
   std::cout << "part1 " << part1(grid) << '\n';
   std::cout << "part2 " << part2(grid, source) << '\n';
 }
