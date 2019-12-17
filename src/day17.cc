@@ -1,16 +1,11 @@
 import "util/check.h";
 import <array>;
 import <charconv>;  // bug
-import <deque>;
 import <optional>;  // bug
 import <span>;
-import <unordered_set>;
-import <unordered_map>;  // bug
-import <vector>;
 import <variant>;
 import util.io;
 import intcode;
-import util.aabb;
 import util.vec2;
 
 enum cell {
