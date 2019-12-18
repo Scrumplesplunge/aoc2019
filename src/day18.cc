@@ -109,10 +109,6 @@ int part1(const grid& grid) {
     state current = frontier.top();
     frontier.pop();
     if (!explored.insert({current.position, current.keys}).second) continue;
-    //auto [x, y] = current.position;
-    //std::cout << "reached " << grid[y][x] << " ["
-    //          << (int)current.position.x << ", "
-    //          << (int)current.position.y << "]\n";
     for (auto& next : explore_unlocked(grid, current)) {
       if (num_keys(next) == grid_keys) return next.distance;
       frontier.push(next);
@@ -122,7 +118,6 @@ int part1(const grid& grid) {
 
 int part2(grid grid) {
   const int grid_keys = num_keys(grid);
-  //std::cout << grid_keys << " keys total.\n";
   auto [x, y] = find(grid, '@');
   grid[y - 1][x - 1] = grid[y - 1][x + 1] = '@';
   grid[y + 1][x - 1] = grid[y + 1][x + 1] = '@';
@@ -152,13 +147,44 @@ int part2(grid grid) {
   }
 }
 
+constexpr bool is_cell(char c) {
+  return is_alpha(c) || c == '.' || c == '#' || c == '@';
+}
+
+auto match_cell(char& c) {
+  return matches<is_cell>(c, "one of [A-Za-z.#@]", match_leading_whitespace);
+}
+
 int main(int argc, char* argv[]) {
   scanner scanner(init(argc, argv));
   std::array<std::array<char, 81>, 81> grid;
   for (auto& row : grid) {
-    (scanner >> row >> exact("\n")).check_ok();
+    for (auto& cell : row) (scanner >> match_cell(cell)).check_ok();
+    (scanner >> exact("\n", "newline")).check_ok();
   }
   (scanner >> scanner::end).check_ok();
+
+  // The fast scanning code assumes all passageways and keys have odd values in
+  // their coordinates.
+  for (int y = 0; y < 81; y++) {
+    for (int x = 0; x < 81; x++) {
+      if (x == 40 && y == 40) continue;
+      auto cell = grid[y][x];
+      if (x == 0 || y == 0 || x == 80 || y == 80) {
+        // All boundaries must be walls.
+        check(cell == '#');
+      } else if (x % 2 == 1 && y % 2 == 1) {
+        // Cells with two odd coordinates must be open passageway.
+        check(cell == '.' || is_key(cell));
+      } else if (x % 2 == 1 || y % 2 == 1) {
+        // Cells with a single odd coordinate must not be keys.
+        check(!is_key(cell));
+      } else {
+        // Cells with no odd coordinates must be walls.
+        check(cell == '#' || is_door(cell));
+      }
+    }
+  }
   
   std::cout << "part1 " << part1(grid) << "\n";
   std::cout << "part2 " << part2(grid) << "\n";
