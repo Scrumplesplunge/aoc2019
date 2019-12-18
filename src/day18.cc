@@ -26,13 +26,6 @@ struct state {
   int distance = 0;
 };
 
-struct state4 {
-  std::array<vec2b, 4> positions = {};
-  std::array<bool, 26> keys = {};
-  int distance = 0;
-  int cost = 0;
-};
-
 constexpr bool is_key(char c) { return is_lower(c); }
 constexpr bool is_door(char c) { return is_upper(c); }
 
@@ -116,6 +109,13 @@ int part1(const grid& grid) {
   }
 }
 
+struct state4 {
+  std::array<vec2b, 4> positions = {};
+  std::array<bool, 26> keys = {};
+  int distance = 0;
+  int cost = 0;
+};
+
 int part2(grid grid) {
   const int grid_keys = num_keys(grid);
   auto [x, y] = find(grid, '@');
@@ -125,17 +125,14 @@ int part2(grid grid) {
   grid[y][x - 1] = grid[y][x + 1] = '#';
   std::set<std::tuple<std::array<vec2b, 4>, std::array<bool, 26>>> explored;
   distance_queue<state4> frontier;
-  frontier.push({
-      {{{x - 1, y - 1}, {x + 1, y - 1}, {x - 1, y + 1}, {x + 1, y + 1}}},
-      {}, 0});
+  frontier.push({{{{x - 1, y - 1}, {x + 1, y - 1},
+                   {x - 1, y + 1}, {x + 1, y + 1}}}, {}, 0});
   while (true) {
     check(!frontier.empty());
     state4 current = frontier.top();
     frontier.pop();
     if (num_keys(current) == grid_keys) return current.distance;
-    if (!explored.emplace(current.positions, current.keys).second) {
-      continue;
-    }
+    if (!explored.emplace(current.positions, current.keys).second) continue;
     for (int i = 0; i < 4; i++) {
       state start = {current.positions[i], current.keys, current.distance};
       for (auto& next : explore_unlocked(grid, start)) {
@@ -157,7 +154,7 @@ auto match_cell(char& c) {
 
 int main(int argc, char* argv[]) {
   scanner scanner(init(argc, argv));
-  std::array<std::array<char, 81>, 81> grid;
+  grid grid;
   for (auto& row : grid) {
     for (auto& cell : row) (scanner >> match_cell(cell)).check_ok();
     (scanner >> exact("\n", "newline")).check_ok();
@@ -166,11 +163,11 @@ int main(int argc, char* argv[]) {
 
   // The fast scanning code assumes all passageways and keys have odd values in
   // their coordinates.
-  for (int y = 0; y < 81; y++) {
-    for (int x = 0; x < 81; x++) {
+  for (int y = 0; y < grid_height; y++) {
+    for (int x = 0; x < grid_width; x++) {
       if (x == 40 && y == 40) continue;
       auto cell = grid[y][x];
-      if (x == 0 || y == 0 || x == 80 || y == 80) {
+      if (x == 0 || y == 0 || x == grid_width - 1 || y == grid_height - 1) {
         // All boundaries must be walls.
         check(cell == '#');
       } else if (x % 2 == 1 && y % 2 == 1) {
