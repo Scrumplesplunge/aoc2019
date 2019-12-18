@@ -34,7 +34,7 @@ struct command {
 
 scanner& operator>>(scanner& s, command& c) {
   char d;
-  if (s >> matches<is_direction>(d) >> c.distance) {
+  if (s >> matches<is_direction>(d, "direction") >> c.distance) {
     c.direction = direction{d};
   }
   return s;

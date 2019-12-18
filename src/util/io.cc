@@ -44,7 +44,7 @@ export std::string_view contents(const char* filename) {
   return std::string_view(data, info.st_size);
 }
 
-enum whitespace_policy {
+export enum whitespace_policy {
   skip_leading_whitespace,
   match_leading_whitespace,
 };
@@ -84,36 +84,59 @@ export class scanner_error : public std::runtime_error {
 };
 
 export template <auto predicate, typename T>
-struct match_type { T& out; std::string_view name; };
+struct match_type {
+  T& out;
+  std::string_view name;
+  whitespace_policy whitespace_policy;
+};
 
 export template <auto predicate, typename T>
-auto matches(T& out,
-             std::string_view name = "<expression matching predicate>") {
-  return match_type<predicate, T>{out, name};
+auto matches(T& out, std::string_view name,
+             whitespace_policy policy = skip_leading_whitespace) {
+  return match_type<predicate, T>{out, name, policy};
 }
 
 export template <auto predicate>
-struct sequence_type { std::string_view& out; std::string_view name; };
+struct sequence_type {
+  std::string_view& out;
+  std::string_view name;
+  whitespace_policy whitespace_policy;
+};
 
 export template <auto predicate>
-auto sequence(std::string_view& out,
-              std::string_view name = "<sequence matching predicate>") {
-  return sequence_type<predicate>{out, name};
+auto sequence(std::string_view& out, std::string_view name,
+              whitespace_policy policy = skip_leading_whitespace) {
+  return sequence_type<predicate>{out, name, policy};
 }
 
 export struct exact_type {
   std::string_view value;
+  std::string name;
   whitespace_policy whitespace_policy;
 };
 
+export auto exact(std::string_view text, std::string name) {
+  return exact_type{text, std::move(name),
+                    !text.empty() && is_space(text.front())
+                        ? match_leading_whitespace
+                        : skip_leading_whitespace};
+}
+
 export auto exact(std::string_view text) {
-  return exact_type{text, !text.empty() && is_space(text.front())
-                              ? match_leading_whitespace
-                              : skip_leading_whitespace};
+  std::ostringstream message;
+  message << "literal string " << std::quoted(text);
+  return exact(text, message.str());
+}
+
+export auto exact(std::string_view text, std::string name,
+                  whitespace_policy policy) {
+  return exact_type{text, std::move(name), policy};
 }
 
 export auto exact(std::string_view text, whitespace_policy policy) {
-  return exact_type{text, policy};
+  std::ostringstream message;
+  message << "literal string " << std::quoted(text);
+  return exact(text, message.str(), policy);
 }
 
 export class scanner {
@@ -160,7 +183,7 @@ export class scanner {
     }
     if (!source_.starts_with(e.value)) {
       std::ostringstream message;
-      message << "expected literal string " << std::quoted(e.value) << ".";
+      message << "expected " << e.name << ".";
       return set_error(message.str());
     }
     advance(e.value.size());
@@ -186,7 +209,7 @@ export class scanner {
   template <auto predicate, typename T>
   [[nodiscard]] scanner& operator>>(match_type<predicate, T> m) {
     if (error_.has_value()) return *this;
-    *this >> whitespace;
+    if (m.whitespace_policy == skip_leading_whitespace) *this >> whitespace;
     location l{source_, line_, column_};
     if (*this >> m.out && predicate(m.out)) return *this;
     source_ = l.source;
@@ -198,7 +221,7 @@ export class scanner {
   template <auto predicate>
   [[nodiscard]] scanner& operator>>(sequence_type<predicate> s) {
     if (error_.has_value()) return *this;
-    *this >> whitespace;
+    if (s.whitespace_policy == skip_leading_whitespace) *this >> whitespace;
     if (source_.empty()) return set_error("unexpected end of input.");
     const auto word_start = source_.data(), last = word_start + source_.size();
     const auto word_end = std::find_if_not(word_start, last, predicate);
@@ -213,7 +236,7 @@ export class scanner {
   [[nodiscard]] scanner& operator>>(std::string_view& v) {
     if (error_.has_value()) return *this;
     constexpr auto not_space = [](char c) { return !is_space(c); };
-    return *this >> sequence<+not_space>(v);
+    return *this >> sequence<+not_space>(v, "visible characters");
   }
 
   template <typename T>
