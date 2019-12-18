@@ -24,6 +24,12 @@ struct state {
   int distance = 0;
 };
 
+struct state4 {
+  std::array<vec2b, 4> positions = {};
+  std::array<bool, 26> keys = {};
+  int distance = 0;
+};
+
 constexpr bool is_key(char c) { return is_lower(c); }
 constexpr bool is_door(char c) { return is_upper(c); }
 
@@ -90,28 +96,76 @@ int num_keys(const grid& grid) {
   return keys;
 }
 
-constexpr auto by_distance = [](const state& l, const state& r) {
+constexpr auto by_distance = [](const auto& l, const auto& r) {
   return l.distance > r.distance;
 };
 
-int part1(const grid& grid) {
+//int part1(const grid& grid) {
+//  const int grid_keys = num_keys(grid);
+//  std::cout << grid_keys << " keys total.\n";
+//  std::set<std::pair<vec2b, std::array<bool, 26>>> explored;
+//  std::priority_queue<state, std::vector<state>, decltype(by_distance)> frontier;
+//  frontier.push({find_player(grid)});
+//  while (true) {
+//    check(!frontier.empty());
+//    state current = frontier.top();
+//    frontier.pop();
+//    if (!explored.insert({current.position, current.keys}).second) continue;
+//    //auto [x, y] = current.position;
+//    //std::cout << "reached " << grid[y][x] << " ["
+//    //          << (int)current.position.x << ", "
+//    //          << (int)current.position.y << "]\n";
+//    for (auto& next : explore_unlocked(grid, current)) {
+//      if (num_keys(next) == grid_keys) return next.distance;
+//      frontier.push(next);
+//    }
+//  }
+//}
+
+int part2(grid grid) {
   const int grid_keys = num_keys(grid);
   std::cout << grid_keys << " keys total.\n";
-  std::set<std::pair<vec2b, std::array<bool, 26>>> explored;
-  std::priority_queue<state, std::vector<state>, decltype(by_distance)> frontier;
-  frontier.push({find_player(grid)});
+  vec2b origin = find_player(grid);
+  std::set<std::pair<std::array<vec2b, 4>, std::array<bool, 26>>> explored;
+  std::priority_queue<state4, std::vector<state4>, decltype(by_distance)>
+      frontier;
+  frontier.push({
+      {{{origin.x - 1, origin.y - 1}, {origin.x + 1, origin.y - 1},
+        {origin.x - 1, origin.y + 1}, {origin.x + 1, origin.y + 1}}},
+      {}, 0});
+  long count = 0;
   while (true) {
     check(!frontier.empty());
-    state current = frontier.top();
+    state4 current = frontier.top();
     frontier.pop();
-    if (!explored.insert({current.position, current.keys}).second) continue;
+    if (++count % 1'000 == 0) {
+      std::cout << "\riterations: " << count << ", explored: "
+                << explored.size() << ", distance: " << current.distance
+                << "  " << std::flush;
+    }
+    bool found = false;
+    for (auto i = explored.lower_bound({current.positions, {}});
+         i != explored.end() && i->first == current.positions; ++i) {
+      bool has_all = true;
+      for (int j = 0; j < 26; j++) {
+        if (current.keys[j] && !i->second[j]) has_all = false;
+      }
+      if (has_all) found = true;
+    }
+    if (found) continue;
+    explored.emplace(current.positions, current.keys);
     //auto [x, y] = current.position;
     //std::cout << "reached " << grid[y][x] << " ["
     //          << (int)current.position.x << ", "
     //          << (int)current.position.y << "]\n";
-    for (auto& next : explore_unlocked(grid, current)) {
-      if (num_keys(next) == grid_keys) return next.distance;
-      frontier.push(next);
+    for (int i = 0; i < 4; i++) {
+      state start = {current.positions[i], current.keys, current.distance};
+      for (auto& next : explore_unlocked(grid, start)) {
+        if (num_keys(next) == grid_keys) return next.distance;
+        state4 combined = {current.positions, next.keys, next.distance};
+        combined.positions[i] = next.position;
+        frontier.push(combined);
+      }
     }
   }
 }
@@ -124,5 +178,6 @@ int main(int argc, char* argv[]) {
   }
   (scanner >> scanner::end).check_ok();
   
-  std::cout << "part1 " << part1(grid) << "\n";
+  //std::cout << "part1 " << part1(grid) << "\n";
+  std::cout << "part2 " << part2(grid) << "\n";
 }
