@@ -1,6 +1,6 @@
 #!/bin/bash
 
-make -q || make opt
+make -q opt || make opt
 for answer in answers/*.txt; do
   puzzle="puzzles/$(basename "$answer")"
   solver="bin/opt/$(basename -s '.txt' "$answer")"
