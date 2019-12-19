@@ -250,6 +250,7 @@ compile_result compile(
         }
       }
       if (!has_sequence(temp_a, b_start)) break;
+      b_start += temp_a.size();
     }
   }
   std::cerr << "Failed to encode the program.\n";
