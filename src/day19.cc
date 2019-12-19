@@ -1,13 +1,10 @@
 import "util/check.h";
 import <array>;
 import <charconv>;  // bug
-import <experimental/coroutine>;  // bug
 import <optional>;  // bug
 import <span>;
-import <variant>;
-import util.io;
 import intcode;
-import util.coroutine;
+import util.io;
 import util.vec2;
 
 bool is_pulled(program::const_span source, vec2i position) {
