@@ -26,7 +26,7 @@ int part1(program::const_span source) {
 
 vec2i start_position(program::const_span source) {
   for (int y = 0; y < 100; y++) {
-    if (is_pulled(source, {99, y})) return {0, y};
+    if (is_pulled(source, {99, y})) return {99, y};
   }
   for (int x = 99; x >= 0; x--) {
     if (is_pulled(source, {x, 99})) return {x, 99};
