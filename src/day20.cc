@@ -16,7 +16,7 @@ import util.coroutine;
 import util.io;
 import util.vec2;
 
-constexpr int grid_width = 128, grid_height = 128;
+constexpr int grid_width = 128, grid_height = 128, grid_levels = 128;
 using grid = std::array<std::array<char, grid_width>, grid_height>;
 
 auto line(std::string_view& out) {
@@ -31,42 +31,31 @@ void getline(scanner& s, std::span<char> out) {
   std::copy(row.begin(), row.end(), out.begin());
 }
 
-generator<vec2i> find(const grid& grid, char c) {
-  for (int y = 0; y < grid_height; y++) {
-    for (int x = 0; x < grid_width; x++) {
-      if (grid[y][x] == c) co_yield vec2i{x, y};
-    }
-  }
-}
+using vec2s = vec2<short>;
 
-std::optional<vec2i> find_from(
-    const grid& grid, vec2i p, std::string_view label) {
+// Find the positions of each portal with the given label.
+generator<vec2s> find(const grid& grid, std::string_view label) {
   check(label.size() == 2);
-  check(grid[p.y][p.x] == label[0]);
-  constexpr vec2i offsets[] = {{1, 0}, {0, 1}};
-  for (vec2i offset : offsets) {
-    auto p2 = p + offset;
-    if (grid[p2.y][p2.x] == label[1]) {
-      auto p0 = p - offset, p3 = p + 2 * offset;
-      return grid[p0.y][p0.x] == '.' ? p0 : p3;
-    }
-  }
-  return std::nullopt;
-}
-
-generator<vec2i> find(const grid& grid, std::string_view label) {
-  check(label.size() == 2);
-  //std::cout << "searching for " << label << "..\n";
-  for (auto candidate : find(grid, label[0])) {
-    //std::cout << "trying (" << candidate.x << ", " << candidate.y << ")..\n";
-    if (auto v = find_from(grid, candidate, label); v) {
-      //std::cout << "match!\n";
-      co_yield *v;
+  // Iterate over every cell searching for the first character of the label.
+  for (short y = 0; y < grid_height; y++) {
+    for (short x = 0; x < grid_width; x++) {
+      if (grid[y][x] != label[0]) continue;
+      // Trying both horizontally and vertically, check if the second character
+      // matches and then find the grid cell which is next to the label.
+      constexpr vec2s offsets[] = {{1, 0}, {0, 1}};
+      for (vec2s offset : offsets) {
+        auto p2 = vec2s{x, y} + offset;
+        if (grid[p2.y][p2.x] == label[1]) {
+          auto p0 = vec2s{x, y} - offset, p3 = vec2s{x, y} + 2 * offset;
+          co_yield grid[p0.y][p0.x] == '.' ? p0 : p3;
+        }
+      }
     }
   }
 }
 
-vec2i find_one(const grid& grid, std::string_view label) {
+// Find a label which has no counterpart.
+vec2s find_one(const grid& grid, std::string_view label) {
   auto search = find(grid, label);
   search.next();
   check(!search.done());
@@ -76,7 +65,8 @@ vec2i find_one(const grid& grid, std::string_view label) {
   return v;
 }
 
-std::pair<vec2i, vec2i> find_two(const grid& grid, std::string_view label) {
+// Find a pair of matching labels (or crash if there are not exactly two).
+std::pair<vec2s, vec2s> find_two(const grid& grid, std::string_view label) {
   auto search = find(grid, label);
   search.next();
   check(!search.done());
@@ -89,21 +79,17 @@ std::pair<vec2i, vec2i> find_two(const grid& grid, std::string_view label) {
   return {a, b};
 }
 
-vec2i find_other(const grid& grid, std::string_view label, vec2i current) {
-  auto [a, b] = find_two(grid, label);
-  check(current == a || current == b);
-  return a == current ? b : a;
-}
-
 struct gates {
-  vec2i start, end;
-  std::map<vec2i, vec2i> portals;
+  vec2s start, end;
+  std::map<vec2s, vec2s> portals;
+  vec2s box_min, box_max;
 };
 
 gates find_gates(const grid& grid) {
   gates output;
   output.start = find_one(grid, "AA");
   output.end = find_one(grid, "ZZ");
+  // Find every portal.
   for (char a = 'A'; a <= 'Z'; a++) {
     for (char b = 'A'; b <= 'Z'; b++) {
       char label[] = {a, b, '\0'};
@@ -115,10 +101,7 @@ gates find_gates(const grid& grid) {
       if (search.done()) continue;  // Label not used.
       auto av = search.value();
       search.next();
-      if (search.done()) {
-        //std::cout << "No matching end for " << label << "\n";
-        continue;
-      }
+      if (search.done()) continue;
       auto bv = search.value();
       search.next();
       check(search.done());
@@ -126,70 +109,77 @@ gates find_gates(const grid& grid) {
       output.portals.emplace(bv, av);
     }
   }
-  //std::cout << "start = (" << output.start.x << ", " << output.start.y << ")\n";
-  //std::cout << "end = (" << output.end.x << ", " << output.end.y << ")\n";
-  //for (const auto& [from, to] : output.portals) {
-  //  std::cout << "portal (" << from.x << ", " << from.y << ") -> ("
-  //            << to.x << ", " << to.y << ")\n";
-  //}
+  // We will distinguish between inner and outer portals by whether or not they
+  // are in contact with the bounding box edge.
+  output.box_min = {grid_width, grid_height};
+  output.box_max = {0, 0};
+  for (const auto& [v, _] : output.portals) {
+    output.box_min.x = std::min(output.box_min.x, v.x);
+    output.box_min.y = std::min(output.box_min.y, v.y);
+    output.box_max.x = std::max(output.box_max.x, v.x);
+    output.box_max.y = std::max(output.box_max.y, v.y);
+  }
   return output;
 }
 
-int part1(const grid& input) {
-  struct entry {
-    vec2i position;
-    int distance = 0;
-  };
-  std::vector<entry> frontier;
-  constexpr auto by_distance = [](const auto& l, const auto& r) {
-    return l.distance > r.distance;
-  };
-  auto empty = [&] { return frontier.empty(); };
-  auto push = [&](entry x) {
-    frontier.push_back(x);
-    std::push_heap(std::begin(frontier), std::end(frontier), by_distance);
-  };
-  auto pop = [&] {
-    std::pop_heap(std::begin(frontier), std::end(frontier), by_distance);
-    auto x = frontier.back();
-    frontier.pop_back();
-    return x;
-  };
-  const gates gates = find_gates(input);
-  push({gates.start, 0});
-  grid explored = {};
-  while (true) {
-    check(!empty());
-    auto current = pop();
-    if (current.position == gates.end) return current.distance;
-    auto [x, y] = current.position;
-    if (explored[y][x]) continue;
-    explored[y][x] = true;
-    constexpr vec2i offsets[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-    for (vec2i offset : offsets) {
-      vec2i v = current.position + offset;
-      if (auto i = gates.portals.find(current.position);
-          i != gates.portals.end() && is_alpha(input[v.y][v.x])) {
-        v = i->second;
-      }
-      if (explored[v.y][v.x] || input[v.y][v.x] != '.') continue;
-      push({v, current.distance + 1});
+struct state {
+  vec2s position;
+  short level = 0;
+  short distance = 0;
+};
+
+generator<state> part1_neighbours(
+    const grid& grid, const gates& gates, state current) {
+  constexpr vec2s offsets[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+  for (vec2s offset : offsets) {
+    vec2s v = current.position + offset;
+    if (auto i = gates.portals.find(current.position);
+        i != gates.portals.end() && is_alpha(grid[v.y][v.x])) {
+      v = i->second;
     }
+    if (grid[v.y][v.x] != '.') continue;
+    co_yield state{v, 0, (short)(current.distance + 1)};
   }
 }
 
-int part2(const grid& input) {
-  struct entry {
-    vec2i position;
-    int level = 0;
-    int distance = 0;
+generator<state> part2_neighbours(
+    const grid& grid, const gates& gates, state current) {
+  auto is_inner = [&](vec2s portal) {
+    auto min = gates.box_min, max = gates.box_max;
+    if (portal.x == min.x || portal.x == max.x) return false;
+    if (portal.y == min.y || portal.y == max.y) return false;
+    return true;
   };
-  std::vector<entry> frontier;
+  constexpr vec2s offsets[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+  for (vec2s offset : offsets) {
+    vec2s v = current.position + offset;
+    short level = current.level;
+    if (auto i = gates.portals.find(current.position);
+        i != gates.portals.end() && is_alpha(grid[v.y][v.x])) {
+      if (is_inner(current.position)) {
+        v = i->second;
+        level++;
+      } else if (level > 0) {
+        v = i->second;
+        level--;
+      } else {
+        // Can't go to negative levels.
+        continue;
+      }
+    }
+    if (grid[v.y][v.x] != '.') continue;
+    co_yield state{v, level, (short)(current.distance + 1)};
+  }
+}
+
+template <auto neighbours>
+int solve(const grid& input) {
+  std::vector<state> frontier;
   constexpr auto by_distance = [](const auto& l, const auto& r) {
     return l.distance > r.distance;
   };
   auto empty = [&] { return frontier.empty(); };
-  auto push = [&](entry x) {
+  auto push = [&](state x) {
     frontier.push_back(x);
     std::push_heap(std::begin(frontier), std::end(frontier), by_distance);
   };
@@ -200,46 +190,20 @@ int part2(const grid& input) {
     return x;
   };
   const gates gates = find_gates(input);
-  vec2i min_gate = {grid_width, grid_height}, max_gate = {0, 0};
-  for (const auto& [v, _] : gates.portals) {
-    min_gate.x = std::min(min_gate.x, v.x);
-    min_gate.y = std::min(min_gate.y, v.y);
-    max_gate.x = std::max(max_gate.x, v.x);
-    max_gate.y = std::max(max_gate.y, v.y);
-  }
-  auto is_inner = [&](vec2i portal) {
-    if (portal.x == min_gate.x || portal.x == max_gate.x) return false;
-    if (portal.y == min_gate.y || portal.y == max_gate.y) return false;
-    return true;
-  };
   push({gates.start, 0, 0});
-  std::set<std::pair<vec2i, int>> explored;
+  grid explored[grid_levels] = {};
   while (true) {
     check(!empty());
     auto current = pop();
     if (current.position == gates.end && current.level == 0) {
       return current.distance;
     }
-    if (!explored.emplace(current.position, current.level).second) continue;
-    constexpr vec2i offsets[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-    for (vec2i offset : offsets) {
-      vec2i v = current.position + offset;
-      int level = current.level;
-      if (auto i = gates.portals.find(current.position);
-          i != gates.portals.end() && is_alpha(input[v.y][v.x])) {
-        if (is_inner(current.position)) {
-          v = i->second;
-          level++;
-        } else if (level > 0) {
-          v = i->second;
-          level--;
-        } else {
-          // Can't go to negative levels.
-          continue;
-        }
-      }
-      if (explored.count({v, level}) || input[v.y][v.x] != '.') continue;
-      push({v, level, current.distance + 1});
+    auto [x, y] = current.position;
+    if (explored[current.level][y][x]) continue;
+    explored[current.level][y][x] = true;
+    for (state next : neighbours(input, gates, current)) {
+      check(next.level < grid_levels);
+      if (!explored[next.level][next.position.y][next.position.x]) push(next);
     }
   }
 }
@@ -255,13 +219,7 @@ int main(int argc, char* argv[]) {
     getline(scanner, grid[height]);
     height++;
   }
-  //for (int y = 0; y < height; y++) {
-  //  for (int x = 0; x < grid_width; x++) {
-  //    std::cout << grid[y][x];
-  //  }
-  //  std::cout << "\n";
-  //}
 
-  std::cout << "part1 " << part1(grid) << "\n";
-  std::cout << "part2 " << part2(grid) << "\n";
+  std::cout << "part1 " << solve<part1_neighbours>(grid) << "\n";
+  std::cout << "part2 " << solve<part2_neighbours>(grid) << "\n";
 }
