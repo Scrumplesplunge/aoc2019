@@ -3,21 +3,16 @@ import <array>;
 import <charconv>;  // bug
 import <experimental/coroutine>;  // bug
 import <iostream>;
-import <map>;
-import <numeric>;
 import <optional>;  // bug
-import <set>;
 import <span>;
-import <string>;
-import <queue>;
 import <vector>;
-import util.circular_buffer;
 import util.coroutine;
 import util.io;
 import util.vec2;
 
 constexpr int grid_width = 128, grid_height = 128, grid_levels = 128;
-using grid = std::array<std::array<char, grid_width>, grid_height>;
+template <typename T>
+using grid = std::array<std::array<T, grid_width>, grid_height>;
 
 auto line(std::string_view& out) {
   constexpr auto not_newline = [](char c) { return c != '\n'; };
@@ -34,7 +29,7 @@ void getline(scanner& s, std::span<char> out) {
 using vec2s = vec2<short>;
 
 // Find the positions of each portal with the given label.
-generator<vec2s> find(const grid& grid, std::string_view label) {
+generator<vec2s> find(const grid<char>& grid, std::string_view label) {
   check(label.size() == 2);
   // Iterate over every cell searching for the first character of the label.
   for (short y = 0; y < grid_height; y++) {
@@ -55,7 +50,7 @@ generator<vec2s> find(const grid& grid, std::string_view label) {
 }
 
 // Find a label which has no counterpart.
-vec2s find_one(const grid& grid, std::string_view label) {
+vec2s find_one(const grid<char>& grid, std::string_view label) {
   auto search = find(grid, label);
   search.next();
   check(!search.done());
@@ -66,7 +61,8 @@ vec2s find_one(const grid& grid, std::string_view label) {
 }
 
 // Find a pair of matching labels (or crash if there are not exactly two).
-std::pair<vec2s, vec2s> find_two(const grid& grid, std::string_view label) {
+std::pair<vec2s, vec2s> find_two(
+    const grid<char>& grid, std::string_view label) {
   auto search = find(grid, label);
   search.next();
   check(!search.done());
@@ -81,14 +77,18 @@ std::pair<vec2s, vec2s> find_two(const grid& grid, std::string_view label) {
 
 struct gates {
   vec2s start, end;
-  std::map<vec2s, vec2s> portals;
+  grid<vec2s> portals;
+  // We will distinguish between inner and outer portals by whether or not they
+  // are in contact with the bounding box edge.
   vec2s box_min, box_max;
 };
 
-gates find_gates(const grid& grid) {
-  gates output;
+gates find_gates(const grid<char>& grid) {
+  gates output = {};
   output.start = find_one(grid, "AA");
   output.end = find_one(grid, "ZZ");
+  output.box_min = {grid_width, grid_height};
+  output.box_max = {0, 0};
   // Find every portal.
   for (char a = 'A'; a <= 'Z'; a++) {
     for (char b = 'A'; b <= 'Z'; b++) {
@@ -105,19 +105,18 @@ gates find_gates(const grid& grid) {
       auto bv = search.value();
       search.next();
       check(search.done());
-      output.portals.emplace(av, bv);
-      output.portals.emplace(bv, av);
+      output.portals[av.y][av.x] = bv;
+      output.portals[bv.y][bv.x] = av;
     }
   }
-  // We will distinguish between inner and outer portals by whether or not they
-  // are in contact with the bounding box edge.
-  output.box_min = {grid_width, grid_height};
-  output.box_max = {0, 0};
-  for (const auto& [v, _] : output.portals) {
-    output.box_min.x = std::min(output.box_min.x, v.x);
-    output.box_min.y = std::min(output.box_min.y, v.y);
-    output.box_max.x = std::max(output.box_max.x, v.x);
-    output.box_max.y = std::max(output.box_max.y, v.y);
+  for (short y = 0; y < grid_height; y++) {
+    for (short x = 0; x < grid_width; x++) {
+      if (output.portals[y][x] == vec2s()) continue;
+      output.box_min.x = std::min(output.box_min.x, x);
+      output.box_min.y = std::min(output.box_min.y, y);
+      output.box_max.x = std::max(output.box_max.x, x);
+      output.box_max.y = std::max(output.box_max.y, y);
+    }
   }
   return output;
 }
@@ -129,13 +128,14 @@ struct state {
 };
 
 generator<state> part1_neighbours(
-    const grid& grid, const gates& gates, state current) {
+    const grid<char>& grid, const gates& gates, state current) {
   constexpr vec2s offsets[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
   for (vec2s offset : offsets) {
+    auto [x, y] = current.position;
     vec2s v = current.position + offset;
-    if (auto i = gates.portals.find(current.position);
-        i != gates.portals.end() && is_alpha(grid[v.y][v.x])) {
-      v = i->second;
+    if (auto v2 = gates.portals[y][x];
+        v2 != vec2s() && is_alpha(grid[v.y][v.x])) {
+      v = v2;
     }
     if (grid[v.y][v.x] != '.') continue;
     co_yield state{v, 0, (short)(current.distance + 1)};
@@ -143,7 +143,7 @@ generator<state> part1_neighbours(
 }
 
 generator<state> part2_neighbours(
-    const grid& grid, const gates& gates, state current) {
+    const grid<char>& grid, const gates& gates, state current) {
   auto is_inner = [&](vec2s portal) {
     auto min = gates.box_min, max = gates.box_max;
     if (portal.x == min.x || portal.x == max.x) return false;
@@ -152,15 +152,16 @@ generator<state> part2_neighbours(
   };
   constexpr vec2s offsets[] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
   for (vec2s offset : offsets) {
+    auto [x, y] = current.position;
     vec2s v = current.position + offset;
     short level = current.level;
-    if (auto i = gates.portals.find(current.position);
-        i != gates.portals.end() && is_alpha(grid[v.y][v.x])) {
+    if (auto v2 = gates.portals[y][x];
+        v2 != vec2s() && is_alpha(grid[v.y][v.x])) {
       if (is_inner(current.position)) {
-        v = i->second;
+        v = v2;
         level++;
       } else if (level > 0) {
-        v = i->second;
+        v = v2;
         level--;
       } else {
         // Can't go to negative levels.
@@ -173,7 +174,7 @@ generator<state> part2_neighbours(
 }
 
 template <auto neighbours>
-int solve(const grid& input) {
+int solve(const grid<char>& input) {
   std::vector<state> frontier;
   constexpr auto by_distance = [](const auto& l, const auto& r) {
     return l.distance > r.distance;
@@ -191,7 +192,7 @@ int solve(const grid& input) {
   };
   const gates gates = find_gates(input);
   push({gates.start, 0, 0});
-  grid explored[grid_levels] = {};
+  grid<bool> explored[grid_levels] = {};
   while (true) {
     check(!empty());
     auto current = pop();
@@ -210,7 +211,7 @@ int solve(const grid& input) {
 
 int main(int argc, char* argv[]) {
   scanner scanner(init(argc, argv));
-  grid grid;
+  grid<char> grid;
   for (auto& row : grid) for (char& c : row) c = ' ';
   getline(scanner, grid[0]);
   int height = 1;
