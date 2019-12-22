@@ -1,5 +1,6 @@
 export module util.vec3;
 
+import <iostream>;
 import <type_traits>;
 
 export template <typename T>
@@ -127,3 +128,8 @@ struct std::hash<vec3<T>> {
     return (word(v.x) * 19) ^ (word(v.y) * 37) ^ (word(v.z) * 53);
   }
 };
+
+export template <typename T>
+std::ostream& operator<<(std::ostream& output, vec3<T> v) {
+  return output << "(" << v.x << ", " << v.y << ", " << v.z << ")";
+}

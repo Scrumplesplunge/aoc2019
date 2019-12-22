@@ -1,5 +1,6 @@
 export module util.vec2;
 
+import <iostream>;
 import <type_traits>;
 
 export template <typename T>
@@ -91,3 +92,8 @@ struct std::hash<vec2<T>> {
     return (v.x * 19) ^ (v.y * 37);
   }
 };
+
+export template <typename T>
+std::ostream& operator<<(std::ostream& output, vec2<T> v) {
+  return output << "(" << v.x << ", " << v.y << ")";
+}
