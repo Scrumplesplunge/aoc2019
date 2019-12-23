@@ -154,7 +154,7 @@ export class program {
     }
   }
 
-  enum state {
+  enum state : signed char {
     ready,
     waiting_for_input,
     output,
