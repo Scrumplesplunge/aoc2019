@@ -11,6 +11,8 @@ import util.circular_buffer;
 import util.io;
 import util.vec2;
 
+using vec2v = vec2<program::value_type>;
+
 struct network;
 
 struct computer {
@@ -21,31 +23,19 @@ struct computer {
   circular_buffer<program::value_type, 5> buffered_output;
 };
 
-
-
 struct network {
   std::array<computer, 50> computers;
 
-  void send(int source, program::value_type destination,
+  void send(program::value_type destination,
             program::value_type x, program::value_type y) {
     check(0 <= destination && destination < 50);
-    std::cout << source << " -> " << destination << ": " << x << " " << y
-              << '\n';
     auto& target = computers[destination];
     target.buffered_input.push(x);
     target.buffered_input.push(y);
-    if (!target.running) {
-      //std::cout << "resume " << destination << "\n";
-      target.running = true;
-    }
+    target.running = true;
   }
 
-  struct run_result {
-    bool hit_255 = false;
-    program::value_type x, y;
-  };
-
-  run_result run(int index) {
+  std::optional<vec2v> run(int index) {
     constexpr int steps = 10;
     auto& computer = computers[index];
     computer.running = true;
@@ -55,7 +45,7 @@ struct network {
         case program::waiting_for_input:
           if (computer.buffered_input.empty()) {
             computer.running = false;
-            return {false, 0, 0};
+            return std::nullopt;
           }
           computer.cpu.provide_input(computer.buffered_input.pop());
           break;
@@ -67,45 +57,32 @@ struct network {
             auto y = computer.buffered_output.pop();
             if (address == 255) {
               computer.state = computer.cpu.resume();
-              return {true, x, y};
+              return vec2v{x, y};
             } else {
-              send(index, address, x, y);
+              send(address, x, y);
             }
           }
           break;
         case program::halt:
-          //std::cout << "halt\n";
           computer.running = false;
-          return {false, 0, 0};
+          return std::nullopt;
       }
       computer.state = computer.cpu.resume();
     }
-    return {false, 0, 0};
+    return std::nullopt;
   }
 };
 
 int part1(network network) {
-  int generation = 0;
   while (true) {
     std::array<bool, 50> running_before, running_after;
     do {
-      if (++generation % 10'000 == 0) {
-        std::map<program::state, int> states;
-        for (auto& x : network.computers) states[x.state]++;
-        std::cout << "\rgeneration " << generation << ": "
-                  << states[program::ready] << " ready, "
-                  << states[program::waiting_for_input] << " waiting for input, "
-                  << states[program::output] << " pending output, "
-                  << states[program::halt] << " halted.     " << std::flush;
-      }
       for (int i = 0; i < 50; i++) {
         running_before[i] = network.computers[i].running;
       }
       for (int i = 0; i < 50; i++) {
         if (network.computers[i].running) {
-          if (auto result = network.run(i); result.hit_255) {
-            return result.y;
-          }
+          if (auto result = network.run(i); result) return result->y;
         }
       }
       for (int i = 0; i < 50; i++) {
@@ -114,37 +91,23 @@ int part1(network network) {
     } while (running_before != running_after);
     for (int i = 0; i < 50; i++) {
       network.computers[i].buffered_input.push(-1);
-      if (auto result = network.run(i); result.hit_255) {
-        return result.y;
-      }
+      if (auto result = network.run(i); result) return result->y;
     }
   }
 }
 
 int part2(network network) {
-  int generation = 0;
   std::optional<program::value_type> previous_y;
-  program::value_type x = 0, y = 0;
+  vec2v nat;
   while (true) {
     std::array<bool, 50> running_before, running_after;
     do {
-      if (++generation % 1'000'000 == 0) {
-        std::map<program::state, int> states;
-        for (auto& x : network.computers) states[x.state]++;
-        std::cout << "\rgeneration " << generation << ": "
-                  << states[program::ready] << " ready, "
-                  << states[program::waiting_for_input] << " waiting for input, "
-                  << states[program::output] << " pending output, "
-                  << states[program::halt] << " halted.     " << std::flush;
-      }
       for (int i = 0; i < 50; i++) {
         running_before[i] = network.computers[i].running;
       }
       for (int i = 0; i < 50; i++) {
         if (network.computers[i].running) {
-          if (auto result = network.run(i); result.hit_255) {
-            x = result.x, y = result.y;
-          }
+          if (auto result = network.run(i); result) nat = *result;
         }
       }
       for (int i = 0; i < 50; i++) {
@@ -155,16 +118,14 @@ int part2(network network) {
       std::map<program::state, int> states;
       for (auto& x : network.computers) states[x.state]++;
       if (states[program::waiting_for_input] == 50) {
-        network.send(255, 0, x, y);
-        if (previous_y && y == *previous_y) return y;
-        previous_y = y;
+        network.send(0, nat.x, nat.y);
+        if (previous_y && nat.y == *previous_y) return nat.y;
+        previous_y = nat.y;
       }
     }
     for (int i = 0; i < 50; i++) {
       network.computers[i].buffered_input.push(-1);
-      if (auto result = network.run(i); result.hit_255) {
-        x = result.x, y = result.y;
-      }
+      if (auto result = network.run(i); result) nat = *result;
     }
   }
 }
