@@ -66,13 +66,6 @@ struct network {
       computer.state = computer.cpu.resume();
     }
   }
-
-  using state_counts = std::array<int, 4>;
-  state_counts state() const {
-    state_counts output = {};
-    for (auto& c : computers) output[c.state]++;
-    return output;
-  }
 };
 
 int part1(network network) {
@@ -88,9 +81,11 @@ int part2(network network) {
   std::optional<program::value_type> previous_y;
   vec2v nat;
   while (true) {
+    std::array<int, 4> state_counts = {};
+    for (auto& c : network.computers) state_counts[c.state]++;
     if (std::none_of(network.computers.begin(), network.computers.end(),
                      [](auto& c) { return c.running(); }) &&
-        network.state()[program::waiting_for_input] == 50) {
+        state_counts[program::waiting_for_input] == 50) {
       network.computers[0].buffered_input.push(nat.x);
       network.computers[0].buffered_input.push(nat.y);
       if (previous_y && nat.y == *previous_y) return nat.y;
