@@ -29,14 +29,6 @@ struct computer {
 struct network {
   std::array<computer, 50> computers;
 
-  void send(program::value_type destination,
-            program::value_type x, program::value_type y) {
-    check(0 <= destination && destination < 50);
-    auto& target = computers[destination];
-    target.buffered_input.push(x);
-    target.buffered_input.push(y);
-  }
-
   // Run computer[i] until it gets blocked. A computer is blocked if it needs
   // input but there is none, if it sends a message to the NAT via address 255,
   // or if it halts. The question says that input should not block, but this is
@@ -62,7 +54,9 @@ struct network {
               computer.state = computer.cpu.resume();
               return vec2v{x, y};
             } else {
-              send(address, x, y);
+              check(0 <= address && address < 50);
+              computers[address].buffered_input.push(x);
+              computers[address].buffered_input.push(y);
             }
           }
           break;
@@ -97,7 +91,8 @@ int part2(network network) {
     if (std::none_of(network.computers.begin(), network.computers.end(),
                      [](auto& c) { return c.running(); }) &&
         network.state()[program::waiting_for_input] == 50) {
-      network.send(0, nat.x, nat.y);
+      network.computers[0].buffered_input.push(nat.x);
+      network.computers[0].buffered_input.push(nat.y);
       if (previous_y && nat.y == *previous_y) return nat.y;
       previous_y = nat.y;
     }
