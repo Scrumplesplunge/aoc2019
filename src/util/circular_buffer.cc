@@ -18,10 +18,12 @@ class circular_buffer {
   }
   constexpr int capacity() const { return buffer_size - 1; }
 
-  void pop() {
+  T pop() {
     assert(!empty());
+    T result = std::move(contents_[front_]);
     front_++;
     if (front_ == buffer_size) front_ -= buffer_size;
+    return result;
   }
 
   template <typename U>
