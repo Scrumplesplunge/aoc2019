@@ -3,7 +3,6 @@ import <array>;
 import <charconv>;  // bug
 import <optional>;  // bug
 import <span>;
-import <unordered_map>;
 import <map>;
 import <set>;
 import <vector>;
@@ -124,10 +123,8 @@ struct world {
 
   bool take(std::string_view item) {
     if (item == "infinite loop") return false;  // Halting problem? Easy.
-    auto temp = *this;
-    auto state = temp.execute("take " + std::string{item});
-    if (temp.robot.current_state() != program::waiting_for_input) return false;
-    *this = std::move(temp);
+    auto state = execute("take " + std::string{item});
+    if (robot.current_state() != program::waiting_for_input) return false;
     scanner scanner(state);
     (scanner >> exact("You take the " + std::string{item} + ".")
              >> exact("\n", "newline") >> exact("Command?")
@@ -137,10 +134,8 @@ struct world {
 
   bool drop(std::string_view item) {
     if (item == "infinite loop") return false;  // Halting problem? Easy.
-    auto temp = *this;
-    auto state = temp.execute("drop " + std::string{item});
-    if (temp.robot.current_state() != program::waiting_for_input) return false;
-    *this = std::move(temp);
+    auto state = execute("drop " + std::string{item});
+    if (robot.current_state() != program::waiting_for_input) return false;
     scanner scanner(state);
     (scanner >> exact("You drop the " + std::string{item} + ".")
              >> exact("\n", "newline") >> exact("Command?")
@@ -149,21 +144,19 @@ struct world {
   }
 
   bool move(direction d) {
-    program temp = robot;
-    check(temp.current_state() == program::waiting_for_input);
+    check(robot.current_state() == program::waiting_for_input);
     const auto& command = direction_names[d];
     for (int i = 0, n = command.size(); i < n; i++) {
-      temp.provide_input(command[i]);
-      check(temp.resume() == program::waiting_for_input);
+      robot.provide_input(command[i]);
+      check(robot.resume() == program::waiting_for_input);
     }
-    temp.provide_input('\n');
+    robot.provide_input('\n');
     std::string state;
-    while (temp.resume() == program::output) {
-      state.push_back((unsigned char)temp.get_output());
+    while (robot.resume() == program::output) {
+      state.push_back((unsigned char)robot.get_output());
     }
     auto next = parse_location(state);
     if (!next) return false;
-    robot = std::move(temp);
     location = *next;
     if (!path.empty() && path.back() == (d + 2) % 4) {
       path.pop_back();
@@ -174,29 +167,23 @@ struct world {
   }
 
   bool move(std::span<const direction> steps) {
-    auto temp = *this;
     for (auto d : steps) {
-      if (!temp.move(d)) return false;
+      if (!move(d)) return false;
     }
-    *this = std::move(temp);
     return true;
   }
 
   bool unmove(std::span<const direction> steps) {
-    auto temp = *this;
     for (int i = steps.size() - 1; i >= 0; i--) {
-      if (!temp.move((direction)((steps[i] + 2) % 4))) return false;
+      if (!move((direction)((steps[i] + 2) % 4))) return false;
     }
-    *this = std::move(temp);
     return true;
   }
 
   bool collect(const item& item) {
-    auto temp = *this;
-    if (!temp.move(item.path)) return false;
-    if (!temp.take(item.name)) return false;
-    if (!temp.unmove(item.path)) return false;
-    *this = std::move(temp);
+    if (!move(item.path)) return false;
+    if (!take(item.name)) return false;
+    if (!unmove(item.path)) return false;
     return true;
   }
 
@@ -238,7 +225,11 @@ int part1(program::const_span source) {
   world state(source);
   // Collect all items and carry them to the security checkpoint.
   for (const auto& item : s.items) {
-    if (state.collect(item)) collectable.push_back(item.name);
+    auto temp = state;
+    if (temp.collect(item)) {
+      collectable.push_back(item.name);
+      state = std::move(temp);
+    }
   }
   std::sort(collectable.begin(), collectable.end());
   const auto security_checkpoint = s.rooms.find("Security Checkpoint");

@@ -3,7 +3,7 @@ import <array>;
 import <charconv>;  // bug
 import <optional>;  // bug
 import <span>;
-import <unordered_map>;  // bug
+import <vector>;
 import intcode;
 import util.circular_buffer;
 import util.io;

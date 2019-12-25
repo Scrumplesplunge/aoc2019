@@ -2,7 +2,7 @@ import "util/check.h";
 import <charconv>;  // bug
 import <optional>;  // bug
 import <span>;
-import <unordered_map>;  // bug
+import <vector>;  // bug
 import util.io;
 import intcode;
 
