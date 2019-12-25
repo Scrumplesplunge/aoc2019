@@ -162,6 +162,7 @@ export class program {
   };
 
   bool done() const { return state_ == halt; }
+  state current_state() const { return state_; }
 
   void provide_input(value_type x) {
     check(state_ == waiting_for_input);
