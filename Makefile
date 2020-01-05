@@ -1,6 +1,6 @@
 # CLANG_PREFIX = ${HOME}/src/clang/build
 
-CXX = ${CLANG_PREFIX}/bin/clang++ -std=c++2a -stdlib=libc++ \
+CXX = ${CLANG_PREFIX}/bin/clang++ -std=c++2a -stdlib=libc++ -march=native \
 			-I${CLANG_PREFIX}/include \
 			-fimplicit-modules -fimplicit-module-maps \
 			-fmodules-cache-path=build \
