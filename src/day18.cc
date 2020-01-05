@@ -20,9 +20,21 @@ using vec2b = vec2<signed char>;
 constexpr int grid_width = 81, grid_height = 81;
 using grid = std::array<std::array<char, grid_width>, grid_height>;
 
-struct key_set : std::bitset<26> {
+struct key_set {
+  unsigned values = 0;
+  bool operator[](int index) { return values & (1 << index); }
+  void set(int index) { values |= 1 << index; }
+  int count() const {
+    unsigned x = values;
+    x = (x & 0x55555555) + ((x >> 1) & 0x55555555);
+    x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+    x = (x & 0x0F0F0F0F) + ((x >> 4) & 0x0F0F0F0F);
+    x = (x & 0x00FF00FF) + ((x >> 8) & 0x00FF00FF);
+    x = (x & 0x0000FFFF) + ((x >> 16) & 0x0000FFFF);
+    return x;
+  }
   friend constexpr bool operator<(const key_set& l, const key_set& r) {
-    return l.to_ulong() < r.to_ulong();
+    return l.values < r.values;
   }
 };
 
