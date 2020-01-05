@@ -20,9 +20,15 @@ using vec2b = vec2<signed char>;
 constexpr int grid_width = 81, grid_height = 81;
 using grid = std::array<std::array<char, grid_width>, grid_height>;
 
+struct key_set : std::bitset<26> {
+  friend constexpr bool operator<(const key_set& l, const key_set& r) {
+    return l.to_ulong() < r.to_ulong();
+  }
+};
+
 struct state {
   vec2b position = {};
-  std::array<bool, 26> keys = {};
+  key_set keys = {};
   int distance = 0;
 };
 
@@ -40,7 +46,7 @@ generator<state> explore_unlocked(const grid& input, const state& start) {
     if (explored[y][x]) continue;
     explored[y][x] = true;
     if (is_key(input[y][x]) && !current.keys[input[y][x] - 'a']) {
-      current.keys[input[y][x] - 'a'] = true;
+      current.keys.set(input[y][x] - 'a');
       co_yield current;
     }
     check(frontier.size() < 995);
@@ -66,11 +72,6 @@ vec2b find(const grid& grid, char c) {
   std::abort();
 }
 
-template <typename T>
-int num_keys(const T& state) {
-  return std::reduce(state.keys.begin(), state.keys.end(), 0);
-}
-
 int num_keys(const grid& grid) {
   int keys = 0;
   for (int y = 0; y < grid_height; y++) {
@@ -91,7 +92,7 @@ using distance_queue =
 
 int part1(const grid& grid) {
   const int grid_keys = num_keys(grid);
-  std::set<std::pair<vec2b, std::array<bool, 26>>> explored;
+  std::set<std::pair<vec2b, key_set>> explored;
   distance_queue<state> frontier;
   auto origin = find(grid, '@');
   for (auto offset : {vec2b{-1, -1}, vec2b{1, -1}, vec2b{-1, 1}, vec2b{1, 1}}) {
@@ -103,7 +104,7 @@ int part1(const grid& grid) {
     frontier.pop();
     if (!explored.insert({current.position, current.keys}).second) continue;
     for (auto& next : explore_unlocked(grid, current)) {
-      if (num_keys(next) == grid_keys) return next.distance;
+      if (next.keys.count() == grid_keys) return next.distance;
       frontier.push(next);
     }
   }
@@ -111,7 +112,7 @@ int part1(const grid& grid) {
 
 struct state4 {
   std::array<vec2b, 4> positions = {};
-  std::array<bool, 26> keys = {};
+  key_set keys = {};
   int distance = 0;
   int cost = 0;
 };
@@ -123,7 +124,7 @@ int part2(grid grid) {
   grid[y + 1][x - 1] = grid[y + 1][x + 1] = '@';
   grid[y - 1][x] = grid[y][x] = grid[y + 1][x] = '#';
   grid[y][x - 1] = grid[y][x + 1] = '#';
-  std::set<std::tuple<std::array<vec2b, 4>, std::array<bool, 26>>> explored;
+  std::set<std::tuple<std::array<vec2b, 4>, key_set>> explored;
   distance_queue<state4> frontier;
   frontier.push({{{{x - 1, y - 1}, {x + 1, y - 1},
                    {x - 1, y + 1}, {x + 1, y + 1}}}, {}, 0});
@@ -131,7 +132,7 @@ int part2(grid grid) {
     check(!frontier.empty());
     state4 current = frontier.top();
     frontier.pop();
-    if (num_keys(current) == grid_keys) return current.distance;
+    if (current.keys.count() == grid_keys) return current.distance;
     if (!explored.emplace(current.positions, current.keys).second) continue;
     for (int i = 0; i < 4; i++) {
       state start = {current.positions[i], current.keys, current.distance};
@@ -182,7 +183,7 @@ int main(int argc, char* argv[]) {
       }
     }
   }
-  
+
   std::cout << "part1 " << part1(grid) << "\n";
   std::cout << "part2 " << part2(grid) << "\n";
 }
