@@ -1,4 +1,5 @@
 import "util/check.h";
+import <array>;
 import <charconv>;  // bug
 import <iostream>;
 import <optional>;  // bug
@@ -6,6 +7,8 @@ import <span>;
 import <string>;
 import <vector>;
 import util.io;
+
+namespace {
 
 enum digit : signed char {};
 
@@ -53,10 +56,12 @@ std::string fft(std::span<const digit> values, int offset = 0) {
   return code;
 }
 
+}  // namespace
+
 int main(int argc, char* argv[]) {
   scanner scanner(init(argc, argv));
-  std::array<digit, 1000> buffer;
-  std::span<digit> values = buffer;
+  std::array<enum digit, 1000> buffer;
+  std::span<enum digit> values = buffer;
   (scanner >> values >> scanner::end).check_ok();
 
   std::cout << "part1 " << fft(values) << '\n';
@@ -69,7 +74,7 @@ int main(int argc, char* argv[]) {
 
   // We never need to compute any values before the index of the output, since
   // the update sequence only ever needs values that come after it.
-  std::vector<digit> input;
+  std::vector<enum digit> input;
   input.reserve(10'000 * values.size() - offset);
   input.insert(
       input.end(), values.begin() + offset % values.size(), values.end());

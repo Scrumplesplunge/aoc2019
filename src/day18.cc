@@ -1,7 +1,7 @@
 import "util/check.h";
 import <array>;
 import <charconv>;  // bug
-import <experimental/coroutine>;  // bug
+import <coroutine>;  // bug
 import <iostream>;
 import <numeric>;
 import <optional>;  // bug

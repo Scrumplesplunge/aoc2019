@@ -62,6 +62,34 @@ constexpr auto operator/(vec2<T> v, S s) {
   return vec2<T>{v.x / s, v.y / s};
 }
 
+export template <typename T, typename U>
+constexpr vec2<T>& operator+=(vec2<T>& l, vec2<U> r) {
+  l.x += r.x;
+  l.y += r.y;
+  return l;
+}
+
+export template <typename T, typename U>
+constexpr vec2<T>& operator-=(vec2<T>& l, vec2<U> r) {
+  l.x -= r.x;
+  l.y -= r.y;
+  return l;
+}
+
+export template <typename T, typename S>
+constexpr vec2<T>& operator*=(vec2<T>& l, S r) {
+  l.x *= r;
+  l.y *= r;
+  return l;
+}
+
+export template <typename T, typename S>
+constexpr vec2<T>& operator/=(vec2<T>& l, S r) {
+  l.x /= r;
+  l.y /= r;
+  return l;
+}
+
 export template <typename T>
 constexpr bool operator==(vec2<T> a, vec2<T> b) {
   return a.x == b.x && a.y == b.y;

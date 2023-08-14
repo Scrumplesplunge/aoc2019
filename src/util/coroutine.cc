@@ -5,7 +5,7 @@ module;
 export module util.coroutine;
 
 import <chrono>;
-import <experimental/coroutine>;
+import <coroutine>;
 import <memory>;
 import <optional>;
 import <thread>;
@@ -93,7 +93,7 @@ export class time_awaiter {
 
   constexpr void await_resume() const {}
 
-  void await_suspend(std::experimental::coroutine_handle<> handle) {
+  void await_suspend(std::coroutine_handle<> handle) {
     current_executor->schedule_at(
         time_, [handle = std::move(handle)]() mutable { handle.resume(); });
   }
@@ -117,7 +117,7 @@ export template <typename T>
 class promise {
  private:
   struct result {
-    void wait(std::experimental::coroutine_handle<> handle) {
+    void wait(std::coroutine_handle<> handle) {
       if (contents) {
         handle.resume();
       } else {
@@ -126,7 +126,7 @@ class promise {
     }
 
     std::optional<T> contents;
-    std::experimental::coroutine_handle<> reader;
+    std::coroutine_handle<> reader;
   };
 
  public:
@@ -135,7 +135,7 @@ class promise {
   // Coroutine await.
   constexpr bool await_ready() const { return result_->contents.has_value(); }
   constexpr T await_resume() const& { return std::move(*result_->contents); }
-  void await_suspend(std::experimental::coroutine_handle<> handle) const {
+  void await_suspend(std::coroutine_handle<> handle) const {
     if (result_->contents) {
       handle.resume();
     } else {
@@ -145,16 +145,16 @@ class promise {
 
   // Coroutine promise type.
   struct promise_type;
-  using handle = std::experimental::coroutine_handle<promise_type>;
+  using handle = std::coroutine_handle<promise_type>;
   struct promise_type {
     constexpr auto get_return_object() { return promise{result}; }
 
     constexpr auto initial_suspend() {
-      return std::experimental::suspend_never{};
+      return std::suspend_never{};
     }
 
-    constexpr auto final_suspend() {
-      return std::experimental::suspend_always{};
+    constexpr auto final_suspend() noexcept {
+      return std::suspend_always{};
     }
 
     constexpr void unhandled_exception() { std::terminate(); }
@@ -196,18 +196,18 @@ class generator {
   }
 
   struct promise_type;
-  using handle = std::experimental::coroutine_handle<promise_type>;
+  using handle = std::coroutine_handle<promise_type>;
   struct promise_type {
     constexpr auto get_return_object() {
       return generator{handle::from_promise(*this)};
     }
 
     constexpr auto initial_suspend() {
-      return std::experimental::suspend_always{};
+      return std::suspend_always{};
     }
 
-    constexpr auto final_suspend() {
-      return std::experimental::suspend_always{};
+    constexpr auto final_suspend() noexcept {
+      return std::suspend_always{};
     }
 
     constexpr void unhandled_exception() {
@@ -218,7 +218,7 @@ class generator {
               typename = std::enable_if_t<std::is_constructible_v<T, U>>>
     constexpr auto yield_value(U&& value) {
       result.emplace(std::forward<U>(value));
-      return std::experimental::suspend_always{};
+      return std::suspend_always{};
     }
 
     constexpr void return_void() {}

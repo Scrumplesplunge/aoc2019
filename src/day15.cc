@@ -1,4 +1,5 @@
 import "util/check.h";
+import <array>;
 import <charconv>;  // bug
 import <deque>;
 import <optional>;  // bug

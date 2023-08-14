@@ -1,7 +1,7 @@
 import "util/check.h";
 import <array>;
 import <charconv>;  // bug
-import <experimental/coroutine>;  // bug
+import <coroutine>;  // bug
 import <iostream>;
 import <optional>;  // bug
 import <span>;
@@ -40,9 +40,10 @@ generator<vec2s> find(const grid<char>& grid, std::string_view label) {
       constexpr vec2s offsets[] = {{1, 0}, {0, 1}};
       for (vec2s offset : offsets) {
         auto p2 = vec2s{x, y} + offset;
-        if (grid[p2.y][p2.x] == label[1]) {
+        if (p2.x < grid_width && p2.y < grid_height &&
+            grid[p2.y][p2.x] == label[1]) {
           auto p0 = vec2s{x, y} - offset, p3 = vec2s{x, y} + 2 * offset;
-          co_yield grid[p0.y][p0.x] == '.' ? p0 : p3;
+          co_yield p0.x >= 0 && p0.y >= 0 && grid[p0.y][p0.x] == '.' ? p0 : p3;
         }
       }
     }

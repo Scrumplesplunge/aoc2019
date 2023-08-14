@@ -40,7 +40,8 @@ std::bitset<25> part1_next(std::bitset<25> grid) {
 int part1(const std::bitset<25> initial) {
   auto grid = initial;
   std::vector<char> seen(1 << 25);
-  for (int i = 0; !seen[grid.to_ulong()]; i++) {
+  while (true) {
+    if (seen[grid.to_ulong()]) break;
     seen[grid.to_ulong()] = true;
     grid = part1_next(grid);
   }
